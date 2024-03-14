@@ -8,7 +8,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/futurice/terraform-provider-dependency-track/internal/provider"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
@@ -41,7 +41,7 @@ func main() {
 		// TODO: Update this string with the published name of your provider.
 		// Also update the tfplugindocs generate command to either remove the
 		// -provider-name flag or set its value to the updated provider name.
-		Address: "registry.terraform.io/hashicorp/scaffolding",
+		Address: "registry.terraform.io/futurice/dependencytrack",
 		Debug:   debug,
 	}
 
