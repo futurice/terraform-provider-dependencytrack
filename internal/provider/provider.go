@@ -6,7 +6,7 @@ package provider
 import (
 	"context"
 
-	dtrack "github.com/DependencyTrack/client-go"
+	dtrack "github.com/futurice/dependency-track-client-go"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -82,7 +82,10 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 		return
 	}
 
-	client, err := dtrack.NewClient(data.Host.ValueString(), dtrack.WithAPIKey(data.APIKey.ValueString()))
+	client, err := dtrack.NewClient(data.Host.ValueString(),
+		dtrack.WithAPIKey(data.APIKey.ValueString()),
+		dtrack.WithDebug(true),
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("TODO: Client creation error", err.Error())
 		return
@@ -94,7 +97,7 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 
 func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewExampleResource,
+		NewTeamResource,
 	}
 }
 
@@ -105,9 +108,7 @@ func (p *DependencyTrackProvider) DataSources(ctx context.Context) []func() data
 }
 
 func (p *DependencyTrackProvider) Functions(ctx context.Context) []func() function.Function {
-	return []func() function.Function{
-		NewExampleFunction,
-	}
+	return []func() function.Function{}
 }
 
 func New(version string) func() provider.Provider {

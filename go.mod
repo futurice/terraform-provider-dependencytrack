@@ -2,8 +2,10 @@ module github.com/futurice/terraform-provider-dependencytrack
 
 go 1.21
 
+replace "github.com/futurice/dependency-track-client-go" v0.0.0 => "../dependency-track-client-go"
+
 require (
-	github.com/DependencyTrack/client-go v0.13.0
+	github.com/futurice/dependency-track-client-go v0.0.0-20240315082339-09ffc71f01c0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/terraform-plugin-docs v0.18.0

@@ -7,15 +7,13 @@ import (
 	"context"
 	"fmt"
 
-	dtrack "github.com/DependencyTrack/client-go"
+	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -32,10 +30,10 @@ type TeamDataSource struct {
 
 // TeamDataSourceModel describes the data source data model.
 type TeamDataSourceModel struct {
-	ID               types.String   `tfsdk:"id"`
-	Name             types.String   `tfsdk:"name"`
-	Permissions      []types.String `tfsdk:"permissions"`
-	MappedOIDCGroups []types.String `tfsdk:"mapped_oidc_groups"`
+	ID               types.String `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	Permissions      types.Set    `tfsdk:"permissions"`
+	MappedOIDCGroups types.Set    `tfsdk:"mapped_oidc_groups"`
 }
 
 func (d *TeamDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -44,7 +42,6 @@ func (d *TeamDataSource) Metadata(ctx context.Context, req datasource.MetadataRe
 
 func (d *TeamDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "TODO data source",
 
 		Attributes: map[string]schema.Attribute{
@@ -56,13 +53,13 @@ func (d *TeamDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 				MarkdownDescription: "Name of the team",
 				Computed:            true,
 			},
-			"permissions": schema.ListAttribute{
-				ElementType:         basetypes.StringType{},
+			"permissions": schema.SetAttribute{
+				ElementType:         types.StringType,
 				MarkdownDescription: "Permissions given to the team",
 				Computed:            true,
 			},
-			"mapped_oidc_groups": schema.ListAttribute{
-				ElementType:         basetypes.StringType{},
+			"mapped_oidc_groups": schema.SetAttribute{
+				ElementType:         types.StringType,
 				MarkdownDescription: "OIDC groups mapped to the team",
 				Computed:            true,
 			},
@@ -71,7 +68,6 @@ func (d *TeamDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 }
 
 func (d *TeamDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
 	}
@@ -91,12 +87,11 @@ func (d *TeamDataSource) Configure(ctx context.Context, req datasource.Configure
 }
 
 func (d *TeamDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data TeamDataSourceModel
+	var model TeamDataSourceModel
 
-	// Read Terraform configuration data into the model
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
 
-	teamID, err := uuid.Parse(data.ID.ValueString())
+	teamID, err := uuid.Parse(model.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("id"),
 			"Invalid team ID",
@@ -118,24 +113,19 @@ func (d *TeamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("read team: %+v", team))
+	model.Name = types.StringValue(team.Name)
 
-	data.Name = types.StringValue(team.Name)
-
-	data.Permissions = make([]types.String, len(team.Permissions))
-	for i, permission := range team.Permissions {
-		data.Permissions[i] = types.StringValue(permission.Name)
+	tfPermissions := make([]string, len(team.Permissions))
+	for i, p := range team.Permissions {
+		tfPermissions[i] = p.Name
 	}
+	model.Permissions, _ = types.SetValueFrom(ctx, types.StringType, tfPermissions)
 
-	data.MappedOIDCGroups = make([]types.String, len(team.MappedOIDCGroups))
-	for i, group := range team.MappedOIDCGroups {
-		data.MappedOIDCGroups[i] = types.StringValue(group.UUID.String())
+	tfOIDCGroups := make([]string, len(team.MappedOIDCGroups))
+	for i, p := range team.MappedOIDCGroups {
+		tfOIDCGroups[i] = p.UUID.String()
 	}
+	model.MappedOIDCGroups, _ = types.SetValueFrom(ctx, types.StringType, tfOIDCGroups)
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "read a data source")
-
-	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
