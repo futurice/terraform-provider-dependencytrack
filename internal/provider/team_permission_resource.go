@@ -182,7 +182,7 @@ func (r *TeamPermissionResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	permission := dtrack.Permission{
-		Name: state.Name.String(),
+		Name: state.Name.ValueString(),
 	}
 
 	_, err := r.client.Permission.RemovePermissionFromTeam(ctx, permission, uuid.MustParse(state.TeamID.ValueString()))

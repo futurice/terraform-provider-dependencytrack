@@ -25,10 +25,30 @@ resource "dependencytrack_team_permission" "main2" {
   name = "ACCESS_MANAGEMENT"
 }
 
-data "dependencytrack_team" "main" {
-  id = dependencytrack_team.main.id
+resource "dependencytrack_project" "main" {
+  name = "foo"
+  classifier = "APPLICATION"
+  active = true
+}
+
+resource "dependencytrack_project" "sub" {
+  name = "bar"
+  classifier = "APPLICATION"
+  parent_id = dependencytrack_project.main.id
+  active = true
+}
+
+resource "dependencytrack_project" "sub2" {
+  name = "baz"
+  classifier = "APPLICATION"
+  # parent_id = dependencytrack_project.main.id
+  active = true
 }
 
 output "team" {
   value = resource.dependencytrack_team.main
+}
+
+output "projecct" {
+  value = resource.dependencytrack_project.main
 }

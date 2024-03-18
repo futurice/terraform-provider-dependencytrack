@@ -99,6 +99,7 @@ func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resour
 	return []func() resource.Resource{
 		NewTeamResource,
 		NewTeamPermissionResource,
+		NewProjectResource,
 	}
 }
 
