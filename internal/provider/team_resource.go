@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -129,14 +128,10 @@ func (r *TeamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	tflog.Debug(ctx, fmt.Sprintf("PLAN: %+v", plan))
-
 	team := dtrack.Team{
 		Name: plan.Name.ValueString(),
 		UUID: uuid.MustParse(state.ID.ValueString()),
 	}
-
-	tflog.Debug(ctx, fmt.Sprintf("TEAM: %+v", team))
 
 	respTeam, err := r.client.Team.Update(ctx, team)
 	if err != nil {

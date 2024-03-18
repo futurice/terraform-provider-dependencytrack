@@ -98,6 +98,7 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewTeamResource,
+		NewTeamPermissionResource,
 	}
 }
 
