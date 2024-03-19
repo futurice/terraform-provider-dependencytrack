@@ -80,6 +80,10 @@ func (r *TeamPermissionResource) Create(ctx context.Context, req resource.Create
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	permission := dtrack.Permission{
 		Name: plan.Name.ValueString(),
 	}
@@ -108,6 +112,10 @@ func (r *TeamPermissionResource) Read(ctx context.Context, req resource.ReadRequ
 	var state TeamPermissionResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	respTeam, err := r.client.Team.Get(ctx, uuid.MustParse(state.TeamID.ValueString()))
 	if err != nil {

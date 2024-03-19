@@ -80,6 +80,10 @@ func (r *ACLMappingResource) Create(ctx context.Context, req resource.CreateRequ
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	mapping := dtrack.ACLMapping{
 		Team:    uuid.MustParse(plan.TeamID.ValueString()),
 		Project: uuid.MustParse(plan.ProjectID.ValueString()),
@@ -98,6 +102,10 @@ func (r *ACLMappingResource) Read(ctx context.Context, req resource.ReadRequest,
 	var state ACLResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	projectMappings, err := r.client.ACLMapping.Get(ctx, uuid.MustParse(state.TeamID.ValueString()))
 	if err != nil {

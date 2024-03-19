@@ -91,6 +91,10 @@ func (d *TeamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	teamID, err := uuid.Parse(model.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("id"),

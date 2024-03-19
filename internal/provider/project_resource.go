@@ -111,6 +111,10 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	project := dtrack.Project{
 		Name:       plan.Name.ValueString(),
 		Classifier: plan.Classifier.ValueString(),
@@ -149,6 +153,10 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	var state ProjectResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	respProject, err := r.client.Project.Get(ctx, uuid.MustParse(state.ID.ValueString()))
 	if err != nil {

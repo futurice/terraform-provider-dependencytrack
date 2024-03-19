@@ -80,6 +80,10 @@ func (r *TeamResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	team := dtrack.Team{
 		Name: plan.Name.ValueString(),
 	}
@@ -100,6 +104,10 @@ func (r *TeamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	var state TeamResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	respTeam, err := r.client.Team.Get(ctx, uuid.MustParse(state.ID.ValueString()))
 	if err != nil {
