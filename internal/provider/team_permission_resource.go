@@ -6,7 +6,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
@@ -87,9 +86,11 @@ func (r *TeamPermissionResource) Create(ctx context.Context, req resource.Create
 
 	respTeam, err := r.client.Permission.AddPermissionToTeam(ctx, permission, uuid.MustParse(plan.TeamID.ValueString()))
 	if err != nil {
-		if strings.Contains(err.Error(), "status: 304") {
-			resp.Diagnostics.AddError("Client Error", "The permission already existed on the team")
-			if strings.Contains(err.Error(), "status: 404") {
+		if apiErr, ok := err.(*dtrack.APIError); ok {
+			switch apiErr.StatusCode {
+			case 304:
+				resp.Diagnostics.AddError("Client Error", "The permission already existed on the team")
+			case 404:
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("The permission '%s' not found", permission.Name))
 			}
 		} else {

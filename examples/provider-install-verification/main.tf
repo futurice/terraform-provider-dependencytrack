@@ -45,6 +45,11 @@ resource "dependencytrack_project" "sub2" {
   active = true
 }
 
+resource "dependencytrack_acl_mapping" "main" {
+  team_id = dependencytrack_team.main.id
+  project_id = dependencytrack_project.main.id
+}
+
 output "team" {
   value = resource.dependencytrack_team.main
 }
