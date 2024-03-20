@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -68,12 +69,10 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Required:            true,
 			},
 			"active": schema.BoolAttribute{
-				MarkdownDescription: "Name of the team",
-				Required:            true,
-			},
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Project UUID",
+				MarkdownDescription: "Whether the project is active or not. Default is true.",
+				Optional:            true,
 				Computed:            true,
+				Default:             booldefault.StaticBool(true),
 			},
 			"parent_id": schema.StringAttribute{
 				MarkdownDescription: "Parent project UUID",
@@ -82,6 +81,10 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"description": schema.StringAttribute{
 				MarkdownDescription: "Name of the team",
 				Optional:            true,
+			},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Project UUID",
+				Computed:            true,
 			},
 		},
 	}
