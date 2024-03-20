@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// Ensure ScaffoldingProvider satisfies various provider interfaces.
+// Ensure DependencyTrackProvider satisfies various provider interfaces.
 var _ provider.Provider = &DependencyTrackProvider{}
 var _ provider.ProviderWithFunctions = &DependencyTrackProvider{}
 
@@ -87,7 +87,7 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 		dtrack.WithDebug(true),
 	)
 	if err != nil {
-		resp.Diagnostics.AddError("TODO: Client creation error", err.Error())
+		resp.Diagnostics.AddError("Depdendency-Track Client creation failed", err.Error())
 		return
 	}
 
