@@ -203,11 +203,15 @@ func (r *NotificationRuleResource) Update(ctx context.Context, req resource.Upda
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	plan.ID = state.ID
+	if plan.PublisherID != state.PublisherID {
+		resp.Diagnostics.AddError("Client Error", "Publisher can not be changed after creation of the alert. Please recreate the resource")
+	}
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	plan.ID = state.ID
 
 	dtRule, diags := TFRuleToDTRule(ctx, plan)
 	resp.Diagnostics.Append(diags...)
