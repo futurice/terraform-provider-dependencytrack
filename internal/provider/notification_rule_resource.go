@@ -16,7 +16,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -63,6 +65,9 @@ func (r *NotificationRuleResource) Schema(ctx context.Context, req resource.Sche
 			"publisher_id": schema.StringAttribute{
 				MarkdownDescription: "Publisher UUID",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"scope": schema.StringAttribute{
 				MarkdownDescription: "Rule scope. Possible values: [PORTFOLIO, SYSTEM]",
@@ -75,6 +80,9 @@ func (r *NotificationRuleResource) Schema(ctx context.Context, req resource.Sche
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Rule UUID",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"enabled": schema.BoolAttribute{
 				Optional: true,
@@ -203,15 +211,9 @@ func (r *NotificationRuleResource) Update(ctx context.Context, req resource.Upda
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	if plan.PublisherID != state.PublisherID {
-		resp.Diagnostics.AddError("Client Error", "Publisher can not be changed after creation of the alert. Please recreate the resource")
-	}
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	plan.ID = state.ID
 
 	dtRule, diags := TFRuleToDTRule(ctx, plan)
 	resp.Diagnostics.Append(diags...)
