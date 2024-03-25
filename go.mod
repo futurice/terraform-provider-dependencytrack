@@ -6,7 +6,7 @@ require (
 	github.com/futurice/dependency-track-client-go v0.0.0-20240322102355-485c6eed2e38
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/terraform-plugin-docs v0.18.0
-	github.com/hashicorp/terraform-plugin-framework v1.6.1
+	github.com/hashicorp/terraform-plugin-framework v1.7.0
 )
 
 require (
