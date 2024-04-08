@@ -103,6 +103,7 @@ func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resour
 		NewProjectResource,
 		NewACLMappingResource,
 		NewNotificationRuleResource,
+		NewNotificationRuleProjectResource,
 		NewNotificationPublisherResource,
 	}
 }

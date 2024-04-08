@@ -43,7 +43,7 @@ func (r *TeamAPIKeyResource) Metadata(ctx context.Context, req resource.Metadata
 
 func (r *TeamAPIKeyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Team permission",
+		MarkdownDescription: "API Key for a team",
 
 		Attributes: map[string]schema.Attribute{
 			"team_id": schema.StringAttribute{
@@ -113,11 +113,6 @@ func (r *TeamAPIKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 	// NOTE: API only returns the API keys for the team when fetching all the teams
 	teams, err := r.client.Team.GetAll(ctx, dtrack.PageOptions{})
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
-			resp.State.RemoveResource(ctx)
-			return
-		}
-
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read team, got error: %s", err))
 		return
 	}
