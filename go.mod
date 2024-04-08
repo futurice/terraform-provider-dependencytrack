@@ -3,7 +3,7 @@ module github.com/futurice/terraform-provider-dependencytrack
 go 1.21
 
 require (
-	github.com/futurice/dependency-track-client-go v0.0.0-20240322102355-485c6eed2e38
+	github.com/futurice/dependency-track-client-go v0.0.0-20240408064444-9e48d412f6d3
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/terraform-plugin-docs v0.18.0
 	github.com/hashicorp/terraform-plugin-framework v1.7.0
