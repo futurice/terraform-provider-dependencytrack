@@ -46,11 +46,11 @@ func (d *NotificationPublisherDataSource) Schema(ctx context.Context, req dataso
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Name of the team",
+				MarkdownDescription: "Name of the publisher",
 				Required:            true,
 			},
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Team UUID",
+				MarkdownDescription: "Publisher UUID",
 				Computed:            true,
 			},
 			"publisher_class": schema.StringAttribute{

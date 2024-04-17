@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
@@ -141,8 +142,6 @@ func (r *TeamPermissionResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	state.TeamID = types.StringValue(respTeam.UUID.String())
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -204,5 +203,12 @@ func (r *TeamPermissionResource) Delete(ctx context.Context, req resource.Delete
 }
 
 func (r *TeamPermissionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	parts := strings.Split(req.ID, "/")
+	if len(parts) != 2 {
+		resp.Diagnostics.AddError("Invalid import ID", "Expected ID in the format 'team_id/permission_name'")
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("team_id"), parts[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }

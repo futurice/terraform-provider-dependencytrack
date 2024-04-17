@@ -21,6 +21,7 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &ProjectResource{}
+var _ resource.ResourceWithConfigure = &ProjectResource{}
 var _ resource.ResourceWithImportState = &ProjectResource{}
 
 func NewProjectResource() resource.Resource {
@@ -179,6 +180,8 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	state.ID = types.StringValue(respProject.UUID.String())
 	state.Name = types.StringValue(respProject.Name)
+	state.Classifier = types.StringValue(respProject.Classifier)
+	state.Active = types.BoolValue(respProject.Active)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
