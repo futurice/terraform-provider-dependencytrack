@@ -10,6 +10,7 @@ import (
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -124,42 +125,24 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	project := dtrack.Project{
-		Name:       plan.Name.ValueString(),
-		Classifier: plan.Classifier.ValueString(),
-		Active:     plan.Active.ValueBool(),
-	}
+	dtProject, diags := TFProjectToDTProject(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 
-	if !plan.ParentID.IsNull() {
-		project.ParentRef = &dtrack.ParentRef{UUID: uuid.MustParse(plan.ParentID.ValueString())}
-	}
-
-	respProject, err := r.client.Project.Create(ctx, project)
+	respProject, err := r.client.Project.Create(ctx, dtProject)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create project, got error: %s", err))
 		return
 	}
 
-	plan.ID = types.StringValue(respProject.UUID.String())
-	plan.Name = types.StringValue(respProject.Name)
-	plan.Classifier = types.StringValue(respProject.Classifier)
-	plan.Active = types.BoolValue(respProject.Active)
-
-	if respProject.Description != "" {
-		plan.Description = types.StringValue(respProject.Description)
-	} else {
-		plan.Description = types.StringNull()
-	}
-
-	if respProject.ParentRef != nil {
-		plan.ParentID = types.StringValue(respProject.ParentRef.UUID.String())
-	}
+	plan, diags = DTProjectToTFProject(ctx, respProject)
+	resp.Diagnostics.Append(diags...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state ProjectResourceModel
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -178,10 +161,8 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	state.ID = types.StringValue(respProject.UUID.String())
-	state.Name = types.StringValue(respProject.Name)
-	state.Classifier = types.StringValue(respProject.Classifier)
-	state.Active = types.BoolValue(respProject.Active)
+	state, diags = DTProjectToTFProject(ctx, respProject)
+	resp.Diagnostics.Append(diags...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -196,33 +177,17 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	project := dtrack.Project{
-		UUID:       uuid.MustParse(state.ID.ValueString()),
-		Name:       plan.Name.ValueString(),
-		Classifier: plan.Classifier.ValueString(),
-		Active:     plan.Active.ValueBool(),
-	}
+	dtProject, diags := TFProjectToDTProject(ctx, plan)
+	resp.Diagnostics.Append(diags...)
 
-	if !plan.ParentID.IsNull() {
-		project.ParentRef = &dtrack.ParentRef{UUID: uuid.MustParse(plan.ParentID.ValueString())}
-	}
-
-	respProject, err := r.client.Project.Update(ctx, project)
+	respProject, err := r.client.Project.Update(ctx, dtProject)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update team, got error: %s", err))
 		return
 	}
 
-	state.ID = types.StringValue(respProject.UUID.String())
-	state.Name = types.StringValue(respProject.Name)
-	state.Classifier = types.StringValue(respProject.Classifier)
-	state.Active = types.BoolValue(respProject.Active)
-
-	if respProject.Description != "" {
-		state.Description = types.StringValue(respProject.Description)
-	} else {
-		state.Description = types.StringNull()
-	}
+	state, diags = DTProjectToTFProject(ctx, respProject)
+	resp.Diagnostics.Append(diags...)
 
 	// API does not return parent ID when updating, so we assume it was updated
 	state.ParentID = plan.ParentID
@@ -250,4 +215,46 @@ func (r *ProjectResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 func (r *ProjectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func DTProjectToTFProject(ctx context.Context, dtProject dtrack.Project) (ProjectResourceModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	project := ProjectResourceModel{
+		ID:          types.StringValue(dtProject.UUID.String()),
+		Name:        types.StringValue(dtProject.Name),
+		Classifier:  types.StringValue(dtProject.Classifier),
+		Active:      types.BoolValue(dtProject.Active),
+		Description: types.StringValue(dtProject.Description),
+	}
+
+	if dtProject.ParentRef != nil {
+		project.ParentID = types.StringValue(dtProject.ParentRef.UUID.String())
+	} else {
+		project.ParentID = types.StringNull()
+	}
+
+	if dtProject.Description != "" {
+		project.Description = types.StringValue(dtProject.Description)
+	} else {
+		project.Description = types.StringNull()
+	}
+
+	return project, diags
+}
+
+func TFProjectToDTProject(ctx context.Context, tfProject ProjectResourceModel) (dtrack.Project, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	project := dtrack.Project{
+		UUID:        uuid.MustParse(tfProject.ID.ValueString()),
+		Name:        tfProject.Name.ValueString(),
+		Classifier:  tfProject.Classifier.ValueString(),
+		Active:      tfProject.Active.ValueBool(),
+		Description: tfProject.Description.ValueString(),
+	}
+
+	if !tfProject.ParentID.IsNull() {
+		project.ParentRef = &dtrack.ParentRef{UUID: uuid.MustParse(tfProject.ParentID.ValueString())}
+	}
+
+	return project, diags
 }
