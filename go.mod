@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/futurice/dependency-track-client-go v0.0.0-20240408102005-c3ad5fb57202
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/terraform-plugin-docs v0.19.0
+	github.com/hashicorp/terraform-plugin-docs v0.19.1
 	github.com/hashicorp/terraform-plugin-framework v1.7.0
 )
 
