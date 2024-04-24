@@ -17,12 +17,12 @@ TODO data source
 
 ### Required
 
-- `name` (String) Name of the team
+- `name` (String) Name of the publisher
 
 ### Read-Only
 
 - `default_publisher` (Boolean) Whether this is the default publisher
-- `id` (String) Team UUID
+- `id` (String) Publisher UUID
 - `publisher_class` (String) Class of the publisher
 - `template` (String) Template used by the publisher
 - `template_mime_type` (String) MIME type of the template
