@@ -220,11 +220,10 @@ func (r *ProjectResource) ImportState(ctx context.Context, req resource.ImportSt
 func DTProjectToTFProject(ctx context.Context, dtProject dtrack.Project) (ProjectResourceModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	project := ProjectResourceModel{
-		ID:          types.StringValue(dtProject.UUID.String()),
-		Name:        types.StringValue(dtProject.Name),
-		Classifier:  types.StringValue(dtProject.Classifier),
-		Active:      types.BoolValue(dtProject.Active),
-		Description: types.StringValue(dtProject.Description),
+		ID:         types.StringValue(dtProject.UUID.String()),
+		Name:       types.StringValue(dtProject.Name),
+		Classifier: types.StringValue(dtProject.Classifier),
+		Active:     types.BoolValue(dtProject.Active),
 	}
 
 	if dtProject.ParentRef != nil {
@@ -245,11 +244,14 @@ func DTProjectToTFProject(ctx context.Context, dtProject dtrack.Project) (Projec
 func TFProjectToDTProject(ctx context.Context, tfProject ProjectResourceModel) (dtrack.Project, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	project := dtrack.Project{
-		UUID:        uuid.MustParse(tfProject.ID.ValueString()),
 		Name:        tfProject.Name.ValueString(),
 		Classifier:  tfProject.Classifier.ValueString(),
 		Active:      tfProject.Active.ValueBool(),
 		Description: tfProject.Description.ValueString(),
+	}
+
+	if tfProject.ID.ValueString() != "" {
+		project.UUID = uuid.MustParse(tfProject.ID.ValueString())
 	}
 
 	if !tfProject.ParentID.IsNull() {
