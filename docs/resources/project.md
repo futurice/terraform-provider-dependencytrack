@@ -3,12 +3,12 @@
 page_title: "dependencytrack_project Resource - dependencytrack"
 subcategory: ""
 description: |-
-  Team
+  Project
 ---
 
 # dependencytrack_project (Resource)
 
-Team
+Project
 
 
 
@@ -18,12 +18,12 @@ Team
 ### Required
 
 - `classifier` (String) Specifies the type of project. Must be one of the following values: [APPLICATION, CONTAINER, PLATFORM, DEVICE, DATA, FIRMWARE, FILE, OPERATING_SYSTEM, FRAMEWORK, MACHINE_LEARNING_MODEL, LIBRARY, DEVICE_DRIVER]
-- `name` (String) Name of the team
+- `name` (String) Name of the project
 
 ### Optional
 
 - `active` (Boolean) Whether the project is active or not. Default is true.
-- `description` (String) Name of the team
+- `description` (String) Description of the project
 - `parent_id` (String) Parent project UUID
 
 ### Read-Only
