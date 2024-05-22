@@ -61,11 +61,11 @@ func (r *ProjectResource) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Team",
+		MarkdownDescription: "Project",
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Name of the team",
+				MarkdownDescription: "Name of the project",
 				Required:            true,
 			},
 			"classifier": schema.StringAttribute{
@@ -83,7 +83,7 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "Name of the team",
+				MarkdownDescription: "Description of the project",
 				Optional:            true,
 			},
 			"id": schema.StringAttribute{
@@ -182,7 +182,7 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	respProject, err := r.client.Project.Update(ctx, dtProject)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update team, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update project, got error: %s", err))
 		return
 	}
 
@@ -206,7 +206,7 @@ func (r *ProjectResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	err := r.client.Project.Delete(ctx, uuid.MustParse(state.ID.ValueString()))
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete team, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete project, got error: %s", err))
 		return
 	}
 
