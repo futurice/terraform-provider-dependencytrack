@@ -117,7 +117,7 @@ func (r *ProjectResource) Configure(ctx context.Context, req resource.ConfigureR
 }
 
 func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ProjectResourceModel
+	var plan, state ProjectResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
@@ -134,10 +134,13 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	plan, diags = DTProjectToTFProject(ctx, respProject)
+	state, diags = DTProjectToTFProject(ctx, respProject)
 	resp.Diagnostics.Append(diags...)
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	// API does not return parent ID when updating, so we assume it was set as requested
+	state.ParentID = plan.ParentID
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
