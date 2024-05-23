@@ -87,7 +87,7 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 		dtrack.WithDebug(true),
 	)
 	if err != nil {
-		resp.Diagnostics.AddError("Depdendency-Track Client creation failed", err.Error())
+		resp.Diagnostics.AddError("Dependency-Track Client creation failed", err.Error())
 		return
 	}
 
