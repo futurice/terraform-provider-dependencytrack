@@ -55,10 +55,21 @@ To compile the provider, run `go install`. This will build the provider and put 
 
 To generate or update documentation, run `go generate`.
 
-In order to run the full suite of Acceptance tests, run `make testacc`.
+### Running the Acceptance tests 
 
-*Note:* Acceptance tests create real resources, and often cost money to run.
+In order to run the full suite of Acceptance tests, run `make testacc`.
 
 ```shell
 make testacc
 ```
+
+Or, to provide extra arguments to `go test`:
+
+```shell
+TESTARGS="..." make testacc
+```
+
+The Acceptance tests require a Dependency-Track API server to run against. One can either be provided, or will be
+started internally by the tests in a Docker container. Providing an external server will speed up the tests, but
+will make them more interdependent and may leave the server in a dirty state requiring manual cleanup.
+Refer to `testutils.NewTestDependencyTrack` for how to configure the Dependency-Track API server.

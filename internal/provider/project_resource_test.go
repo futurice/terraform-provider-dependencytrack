@@ -22,18 +22,11 @@ import (
 var testDependencyTrack *testutils.TestDependencyTrack
 
 func TestMain(m *testing.M) {
-	var err error
-	testDependencyTrack, err = testutils.NewTestDependencyTrack()
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Failed to initialize test: %v\n", err)
-		os.Exit(1)
+	if os.Getenv(resource.EnvTfAcc) != "" {
+		var cleanup func()
+		testDependencyTrack, cleanup = testutils.InitTestDependencyTrack()
+		defer cleanup()
 	}
-
-	defer func() {
-		if err := testDependencyTrack.Close(); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Failed to clean-up test: %v\n", err)
-		}
-	}()
 
 	m.Run()
 }
