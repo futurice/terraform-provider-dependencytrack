@@ -3,6 +3,7 @@ package testutils
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
@@ -20,4 +21,17 @@ func GetResourceID(state *terraform.State, resourceName string) (uuid.UUID, erro
 	}
 
 	return id, nil
+}
+
+func TestAccCheckGetResourceID(resourceName string, uuidOutput *uuid.UUID) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		id, err := GetResourceID(state, resourceName)
+		if err != nil {
+			return err
+		}
+
+		*uuidOutput = id
+
+		return nil
+	}
 }

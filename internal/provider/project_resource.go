@@ -6,10 +6,8 @@ package provider
 import (
 	"context"
 	"fmt"
-
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
-
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
