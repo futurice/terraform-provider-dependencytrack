@@ -31,14 +31,50 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestAccProjectResource(t *testing.T) {
-	ctx := context.Background()
+func TestAccProjectResource_basic(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
 
-	resourceName := "dependencytrack_project.test"
-	projectName := acctest.RandomWithPrefix("test-project")
+	projectResourceName := createProjectResourceName("test")
 
-	expectedProject := dtrack.Project{
-		Name:        projectName,
+	testProject := dtrack.Project{
+		Name:       acctest.RandomWithPrefix("test-project"),
+		Classifier: "APPLICATION",
+		Active:     true,
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectConfigBasic(testDependencyTrack, testProject.Name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					resource.TestCheckResourceAttrSet(projectResourceName, "id"),
+					resource.TestCheckResourceAttr(projectResourceName, "name", testProject.Name),
+					resource.TestCheckResourceAttr(projectResourceName, "classifier", testProject.Classifier),
+					resource.TestCheckNoResourceAttr(projectResourceName, "description"),
+					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(testProject.Active)),
+					resource.TestCheckNoResourceAttr(projectResourceName, "parent_id"),
+				),
+			},
+			{
+				ResourceName:      projectResourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+		CheckDestroy: testAccCheckProjectDoesNotExists(ctx, testDependencyTrack, projectResourceName),
+	})
+}
+
+func TestAccProjectResource_description(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
+
+	projectResourceName := createProjectResourceName("test")
+
+	testProject := dtrack.Project{
+		Name:        acctest.RandomWithPrefix("test-project"),
 		Classifier:  "APPLICATION",
 		Description: "Description",
 		Active:      true,
@@ -49,34 +85,85 @@ func TestAccProjectResource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccProjectResourceConfig(testDependencyTrack, projectName),
+				Config: testAccProjectConfigDescription(testDependencyTrack, testProject.Name, testProject.Description),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasData(ctx, testDependencyTrack, resourceName, expectedProject),
-					resource.TestCheckResourceAttr(resourceName, "name", expectedProject.Name),
-					resource.TestCheckResourceAttr(resourceName, "classifier", expectedProject.Classifier),
-					resource.TestCheckResourceAttr(resourceName, "description", expectedProject.Description),
-					resource.TestCheckResourceAttr(resourceName, "active", strconv.FormatBool(expectedProject.Active)),
-					resource.TestCheckNoResourceAttr(resourceName, "parent_id"),
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					resource.TestCheckResourceAttr(projectResourceName, "description", testProject.Description),
 				),
 			},
 		},
-		CheckDestroy: testAccCheckProjectDoesNotExists(ctx, testDependencyTrack, resourceName),
 	})
 }
 
-func testAccProjectResourceConfig(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
-	resources := fmt.Sprintf(`
+func TestAccProjectResource_inactive(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
+
+	projectResourceName := createProjectResourceName("test")
+
+	testProject := dtrack.Project{
+		Name:       acctest.RandomWithPrefix("test-project"),
+		Classifier: "APPLICATION",
+		Active:     false,
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectConfigInactive(testDependencyTrack, testProject.Name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(false)),
+				),
+			},
+		},
+	})
+}
+
+func testAccProjectConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
+	return testDependencyTrack.AddProviderConfiguration(
+		fmt.Sprintf(`
 resource "dependencytrack_project" "test" {
-  name       = %[1]q
-  classifier = "APPLICATION"
-  description = "Description"
+	name        = %[1]q
+	classifier  = "APPLICATION"
 }
-`, projectName)
-
-	return testDependencyTrack.AddProviderConfiguration(resources)
+`,
+			projectName,
+		),
+	)
 }
 
-func testAccCheckProjectExistsAndHasData(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedProject dtrack.Project) resource.TestCheckFunc {
+func testAccProjectConfigDescription(testDependencyTrack *testutils.TestDependencyTrack, projectName, projectDescription string) string {
+	return testDependencyTrack.AddProviderConfiguration(
+		fmt.Sprintf(`
+resource "dependencytrack_project" "test" {
+	name        = %[1]q
+	classifier  = "APPLICATION"
+	description = %[2]q
+}
+`,
+			projectName,
+			projectDescription,
+		),
+	)
+}
+
+func testAccProjectConfigInactive(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
+	return testDependencyTrack.AddProviderConfiguration(
+		fmt.Sprintf(`
+resource "dependencytrack_project" "test" {
+	name        = %[1]q
+	classifier  = "APPLICATION"
+	active		= false
+}
+`,
+			projectName,
+		),
+	)
+}
+
+func testAccCheckProjectExistsAndHasExpectedData(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedProject dtrack.Project) resource.TestCheckFunc {
 	return func(state *terraform.State) error {
 		project, err := findProjectByResourceName(ctx, testDependencyTrack, state, resourceName)
 		if err != nil {
@@ -110,12 +197,10 @@ func testAccCheckProjectDoesNotExists(ctx context.Context, testDependencyTrack *
 }
 
 func findProjectByResourceName(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, state *terraform.State, resourceName string) (*dtrack.Project, error) {
-	res, ok := state.RootModule().Resources[resourceName]
-	if !ok {
-		return nil, fmt.Errorf("resource not found: %s", resourceName)
+	projectID, err := testutils.GetResourceID(state, resourceName)
+	if err != nil {
+		return nil, err
 	}
-
-	projectID := uuid.MustParse(res.Primary.ID)
 
 	project, err := findProject(ctx, testDependencyTrack, projectID)
 	if err != nil {
@@ -138,4 +223,8 @@ func findProject(ctx context.Context, testDependencyTrack *testutils.TestDepende
 	}
 
 	return &project, nil
+}
+
+func createProjectResourceName(localName string) string {
+	return fmt.Sprintf("dependencytrack_project.%s", localName)
 }
