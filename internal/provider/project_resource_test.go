@@ -164,7 +164,7 @@ func TestAccProjectResource_parent(t *testing.T) {
 	//     - in the two "low level" tests below (was trying to find a minimal case)
 	//     - in the "very low level" test below, which side-steps dtrack client lib completely for project creation
 	//       and uses verbatim requests that our provider sends, copied from the log - still nothing...
-	t.Skip("Skipped due to breaking Dependency-Track")
+	// t.Skip("Skipped due to breaking Dependency-Track")
 
 	//ctx := testutils.CreateTestContext(t)
 	//
