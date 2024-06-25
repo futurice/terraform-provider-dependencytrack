@@ -3,7 +3,9 @@ package testutils
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"time"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
@@ -13,6 +15,7 @@ import (
 
 const ExternalDependencyTrackEndpointEnvVarName = "TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT"
 const ExternalDependencyTrackApikeyEnvVarName = "TF_ACC_EXTERNAL_DEPENDENCY_TRACK_APIKEY"
+const ShowDependencyTrackContainerLogsEnvVarName = "TF_ACC_SHOW_DEPENDENCY_TRACK_CONTAINER_LOGS"
 
 const defaultDependencyTrackUser = "admin"
 const defaultDependencyTrackPassword = "admin"
@@ -24,7 +27,14 @@ type TestDependencyTrack struct {
 	ApiKey   string
 	Client   *dtrack.Client
 
+	config    *testDependencyTrackConfig
 	container testcontainers.Container
+}
+
+type testDependencyTrackConfig struct {
+	endpoint          string
+	apiKey            string
+	showContainerLogs bool
 }
 
 // InitTestDependencyTrack is a utility function intended to be used within TestMain to
@@ -60,6 +70,10 @@ func InitTestDependencyTrack() (testDependencyTrack *TestDependencyTrack, cleanu
 //     TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT. The API key should have all permissions. This variable must
 //     be defined if TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT is defined, and must not be defined otherwise.
 //
+//   - TF_ACC_SHOW_DEPENDENCY_TRACK_CONTAINER_LOGS - if set to a non-empty value will cause the
+//     Dependency-Track API server container logs to be printed after each test suite run. Ignored if an extenal
+//     endpoint is configured.
+//
 // If TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT is empty/unset an internal Dockerized Dependency-Track will be
 // started and configured for the test, to be discarded after the test.
 func NewTestDependencyTrack() (*TestDependencyTrack, error) {
@@ -71,7 +85,7 @@ func NewTestDependencyTrack() (*TestDependencyTrack, error) {
 	if config.isExternalDependencyTrackConfigured() {
 		return newTestDependencyTrackFromExternalEndpoint(config)
 	} else {
-		return newTestDependencyTrackFromInternalContainer()
+		return newTestDependencyTrackFromInternalContainer(config)
 	}
 }
 
@@ -91,7 +105,7 @@ provider "dependencytrack" {
 // In case an external API server was used it will not be affected by Close.
 func (tdt *TestDependencyTrack) Close() error {
 	if tdt.container != nil {
-		err := stopDependencyTrackContainer(context.Background(), tdt.container)
+		err := stopDependencyTrackContainer(context.Background(), tdt.config, tdt.container)
 		if err != nil {
 			return err
 		}
@@ -100,11 +114,6 @@ func (tdt *TestDependencyTrack) Close() error {
 	fmt.Printf("Test Dependency-Track closed")
 
 	return nil
-}
-
-type testDependencyTrackConfig struct {
-	endpoint string
-	apiKey   string
 }
 
 func (c *testDependencyTrackConfig) validate() error {
@@ -125,8 +134,9 @@ func (c *testDependencyTrackConfig) isExternalDependencyTrackConfigured() bool {
 
 func getTestDependencyTrackConfig() (*testDependencyTrackConfig, error) {
 	config := &testDependencyTrackConfig{
-		endpoint: os.Getenv(ExternalDependencyTrackEndpointEnvVarName),
-		apiKey:   os.Getenv(ExternalDependencyTrackApikeyEnvVarName),
+		endpoint:          os.Getenv(ExternalDependencyTrackEndpointEnvVarName),
+		apiKey:            os.Getenv(ExternalDependencyTrackApikeyEnvVarName),
+		showContainerLogs: os.Getenv(ShowDependencyTrackContainerLogsEnvVarName) != "",
 	}
 
 	if err := config.validate(); err != nil {
@@ -148,14 +158,16 @@ func newTestDependencyTrackFromExternalEndpoint(config *testDependencyTrackConfi
 	fmt.Printf("Using extrernal Dependency-Track with endpoint: %s\n", config.endpoint)
 
 	return &TestDependencyTrack{
-		Endpoint:  config.endpoint,
-		ApiKey:    config.apiKey,
-		Client:    client,
+		Endpoint: config.endpoint,
+		ApiKey:   config.apiKey,
+		Client:   client,
+
+		config:    config,
 		container: nil,
 	}, nil
 }
 
-func newTestDependencyTrackFromInternalContainer() (*TestDependencyTrack, error) {
+func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConfig) (*TestDependencyTrack, error) {
 	ctx := context.Background()
 
 	container, err := startDependencyTrackContainer(ctx)
@@ -165,9 +177,9 @@ func newTestDependencyTrackFromInternalContainer() (*TestDependencyTrack, error)
 
 	fmt.Printf("Configuring test Dependency-Track\n")
 
-	testDependencyTrack, err := configureDependencyTrackContainer(ctx, container)
+	testDependencyTrack, err := configureDependencyTrackContainer(ctx, config, container)
 	if err != nil {
-		stopErr := stopDependencyTrackContainer(ctx, container)
+		stopErr := stopDependencyTrackContainer(ctx, config, container)
 		if stopErr != nil {
 			err = fmt.Errorf("%w (also failed to stop the container with error %v)", err, stopErr)
 		}
@@ -184,7 +196,7 @@ func startDependencyTrackContainer(ctx context.Context) (testcontainers.Containe
 	containerRequest := testcontainers.ContainerRequest{
 		Image:        "dependencytrack/apiserver:4.11.3",
 		ExposedPorts: []string{"8080/tcp"},
-		WaitingFor:   wait.ForLog("Dependency-Track is ready"),
+		WaitingFor:   wait.ForLog("Dependency-Track is ready").WithStartupTimeout(2 * time.Minute),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -195,7 +207,13 @@ func startDependencyTrackContainer(ctx context.Context) (testcontainers.Containe
 	return container, err
 }
 
-func stopDependencyTrackContainer(ctx context.Context, container testcontainers.Container) error {
+func stopDependencyTrackContainer(ctx context.Context, config *testDependencyTrackConfig, container testcontainers.Container) error {
+	if config.showContainerLogs {
+		if err := showDependencyTrackContainerLogs(ctx, container); err != nil {
+			return fmt.Errorf("could not show Dependency-Track container logs: %w", err)
+		}
+	}
+
 	if err := container.Terminate(ctx); err != nil {
 		return fmt.Errorf("could not stop Dependency-Track container: %w", err)
 	}
@@ -203,7 +221,26 @@ func stopDependencyTrackContainer(ctx context.Context, container testcontainers.
 	return nil
 }
 
-func configureDependencyTrackContainer(ctx context.Context, container testcontainers.Container) (*TestDependencyTrack, error) {
+func showDependencyTrackContainerLogs(ctx context.Context, container testcontainers.Container) error {
+	logReader, err := container.Logs(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get Dependency-Track container logs from Docker: %w", err)
+	}
+	defer logReader.Close()
+
+	fmt.Printf("********* Dependency-Track container logs\n")
+
+	_, err = io.Copy(os.Stdout, logReader)
+	if err != nil {
+		return fmt.Errorf("could not copy Dependency-Track container logs to stdout: %w", err)
+	}
+
+	fmt.Printf("********* End of Dependency-Track container logs\n")
+
+	return nil
+}
+
+func configureDependencyTrackContainer(ctx context.Context, config *testDependencyTrackConfig, container testcontainers.Container) (*TestDependencyTrack, error) {
 	containerEndpoint, err := container.Endpoint(ctx, "http")
 	if err != nil {
 		return nil, fmt.Errorf("could not get Dependency-Track container endpoint: %w", err)
@@ -234,6 +271,7 @@ func configureDependencyTrackContainer(ctx context.Context, container testcontai
 		ApiKey:   apiKey,
 		Client:   adminClient,
 
+		config:    config,
 		container: container,
 	}, nil
 }
