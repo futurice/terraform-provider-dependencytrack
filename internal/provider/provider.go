@@ -54,6 +54,12 @@ func (p *DependencyTrackProvider) Schema(ctx context.Context, req provider.Schem
 	}
 }
 
+// FIXME
+//type ResourceData struct {
+//	client   *dtrack.Client
+//	dsClient *dtrack.Client
+//}
+
 func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var data DependencyTrackProviderModel
 
@@ -91,8 +97,24 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 		return
 	}
 
+	// FIXME
+	//dsClient, err := dtrack.NewClient(data.Host.ValueString(),
+	//	dtrack.WithAPIKey(data.APIKey.ValueString()),
+	//	dtrack.WithDebug(true),
+	//)
+	//if err != nil {
+	//	resp.Diagnostics.AddError("Dependency-Track DS Client creation failed", err.Error())
+	//	return
+	//}
+
 	resp.DataSourceData = client
 	resp.ResourceData = client
+
+	// FIXME
+	//resp.ResourceData = &ResourceData{
+	//	client:   client,
+	//	dsClient: dsClient,
+	//}
 }
 
 func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resource.Resource {

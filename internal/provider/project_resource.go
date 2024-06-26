@@ -30,6 +30,8 @@ func NewProjectResource() resource.Resource {
 // ProjectResource defines the resource implementation.
 type ProjectResource struct {
 	client *dtrack.Client
+	// FIXME
+	// dsClient *dtrack.Client
 }
 
 // ProjectResourceModel describes the resource data model.
@@ -102,6 +104,9 @@ func (r *ProjectResource) Configure(ctx context.Context, req resource.ConfigureR
 
 	client, ok := req.ProviderData.(*dtrack.Client)
 
+	// FIXME
+	// rd, ok := req.ProviderData.(*ResourceData)
+
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
@@ -112,6 +117,10 @@ func (r *ProjectResource) Configure(ctx context.Context, req resource.ConfigureR
 	}
 
 	r.client = client
+
+	// FIXME
+	//r.client = rd.client
+	//r.dsClient = rd.dsClient
 }
 
 func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -135,7 +144,26 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 	state, diags = DTProjectToTFProject(ctx, respProject)
 	resp.Diagnostics.Append(diags...)
 
-	// API does not return parent ID when updating, so we assume it was set as requested
+	// FIXME
+	//if !strings.Contains(respProject.Name, "parent") {
+	//	getProject, err := r.client.Project.Get(ctx, respProject.UUID)
+	//	if err != nil {
+	//		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get project, got error: %s", err))
+	//		return
+	//	}
+	//
+	//	fmt.Printf("Got project: %v\n", getProject)
+	//}
+
+	//getProject2, err := r.client.Project.Get(ctx, respProject.UUID)
+	//if err != nil {
+	//	resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get project, got error: %s", err))
+	//	return
+	//}
+	//
+	//fmt.Printf("Got project 2: %v\n", getProject2)
+
+	// API does not return parent ID when creating, so we assume it was set as requested
 	state.ParentID = plan.ParentID
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

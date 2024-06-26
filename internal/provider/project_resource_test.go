@@ -7,6 +7,7 @@ import (
 	"fmt"
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
@@ -21,8 +22,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 )
 
 var testDependencyTrack *testutils.TestDependencyTrack
@@ -190,6 +189,9 @@ func TestAccProjectResource_parent(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProjectConfigParent(testDependencyTrack, projectName),
+				//Check: resource.ComposeAggregateTestCheckFunc(
+				//	testutils.TestAccCheckDelay(20 * time.Second),
+				//),
 				// FIXME uncomment and possibly fix/finnish these checks once the config applies correctly
 				//Check: resource.ComposeAggregateTestCheckFunc(
 				//	testutils.TestAccCheckGetResourceID(parentProjectResourceName, &parentProjectID),
@@ -331,6 +333,13 @@ func TestAccVeryLowLevel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create child project: %v", err)
 	}
+
+	readParentProject, err := testDependencyTrack.Client.Project.Get(ctx, uuid.MustParse(parentId))
+	if err != nil {
+		t.Fatalf("Failed to read parent project: %v", err)
+	}
+
+	fmt.Printf("Parent project: %v\n", readParentProject)
 
 	readChildProject, err := testDependencyTrack.Client.Project.Get(ctx, uuid.MustParse(childId))
 	if err != nil {
