@@ -137,7 +137,16 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 	state, diags = DTProjectToTFProject(ctx, respProject)
 	resp.Diagnostics.Append(diags...)
 
-	// API does not return parent ID when updating, so we assume it was set as requested
+	// Workaround for https://github.com/DependencyTrack/dependency-track/issues/3883
+	//   If we do not get the project right after creating it, we might get an incorrect
+	//   response later. For one thing, this would break our tests.
+	_, err = r.client.Project.Get(ctx, respProject.UUID)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to get newly created project, got error: %s", err))
+		return
+	}
+
+	// API does not return parent ID when creating, so we assume it was set as requested
 	state.ParentID = plan.ParentID
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
