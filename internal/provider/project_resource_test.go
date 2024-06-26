@@ -5,18 +5,16 @@ import (
 	"errors"
 	"fmt"
 	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"os"
 	"strconv"
 	"testing"
-
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-
-	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 )
 
 var testDependencyTrack *testutils.TestDependencyTrack
@@ -121,6 +119,41 @@ func TestAccProjectResource_inactive(t *testing.T) {
 	})
 }
 
+func TestAccProjectResource_parent(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
+
+	childProjectResourceName := createProjectResourceName("test")
+	parentProjectResourceName := createProjectResourceName("parent")
+
+	projectName := acctest.RandomWithPrefix("test-project")
+
+	createTestProject := func(parentID *string) dtrack.Project {
+		return dtrack.Project{
+			Name:       projectName,
+			Classifier: "APPLICATION",
+			Active:     true,
+			ParentRef:  &dtrack.ParentRef{UUID: uuid.MustParse(*parentID)},
+		}
+	}
+
+	var parentProjectID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectConfigParent(testDependencyTrack, projectName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testutils.TestAccCheckGetResourceID(parentProjectResourceName, &parentProjectID),
+					testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, childProjectResourceName, func() dtrack.Project { return createTestProject(&parentProjectID) }),
+					resource.TestCheckResourceAttrPtr(childProjectResourceName, "parent_id", &parentProjectID),
+				),
+			},
+		},
+	})
+}
+
 func testAccProjectConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		fmt.Sprintf(`
@@ -163,8 +196,40 @@ resource "dependencytrack_project" "test" {
 	)
 }
 
+func testAccProjectConfigParent(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
+	parentProjectName := fmt.Sprintf("parent-%s", projectName)
+
+	return testDependencyTrack.AddProviderConfiguration(
+		testutils.ComposeConfigs(
+			fmt.Sprintf(`
+resource "dependencytrack_project" "parent" {
+	name        = %[1]q
+	classifier  = "APPLICATION"
+}
+`,
+				parentProjectName,
+			),
+			fmt.Sprintf(`
+resource "dependencytrack_project" "test" {
+	name        	= %[1]q
+	classifier  	= "APPLICATION"
+	parent_id		= dependencytrack_project.parent.id
+}
+`,
+				projectName,
+			),
+		),
+	)
+}
+
 func testAccCheckProjectExistsAndHasExpectedData(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedProject dtrack.Project) resource.TestCheckFunc {
+	return testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, resourceName, func() dtrack.Project { return expectedProject })
+}
+
+func testAccCheckProjectExistsAndHasExpectedLazyData(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedProjectCreator func() dtrack.Project) resource.TestCheckFunc {
 	return func(state *terraform.State) error {
+		expectedProject := expectedProjectCreator()
+
 		project, err := findProjectByResourceName(ctx, testDependencyTrack, state, resourceName)
 		if err != nil {
 			return err
