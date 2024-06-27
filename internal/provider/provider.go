@@ -5,9 +5,15 @@ package provider
 
 import (
 	"context"
-
 	dtrack "github.com/futurice/dependency-track-client-go"
-
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/aclmapping"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationpublisher"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationrule"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationruleproject"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/project"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/team"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/teamapikey"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/teampermission"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -97,21 +103,21 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 
 func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewTeamResource,
-		NewTeamAPIKeyResource,
-		NewTeamPermissionResource,
-		NewProjectResource,
-		NewACLMappingResource,
-		NewNotificationRuleResource,
-		NewNotificationRuleProjectResource,
-		NewNotificationPublisherResource,
+		team.NewTeamResource,
+		teamapikey.NewTeamAPIKeyResource,
+		teampermission.NewTeamPermissionResource,
+		project.NewProjectResource,
+		aclmapping.NewACLMappingResource,
+		notificationrule.NewNotificationRuleResource,
+		notificationruleproject.NewNotificationRuleProjectResource,
+		notificationpublisher.NewNotificationPublisherResource,
 	}
 }
 
 func (p *DependencyTrackProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewTeamDataSource,
-		NewNotificationPublisherDataSource,
+		team.NewTeamDataSource,
+		notificationpublisher.NewNotificationPublisherDataSource,
 	}
 }
 

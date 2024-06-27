@@ -1,4 +1,4 @@
-package provider_test
+package project_test
 
 import (
 	"context"
@@ -42,8 +42,8 @@ func TestAccProjectResource_basic(t *testing.T) {
 	}
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProjectConfigBasic(testDependencyTrack, projectName),
@@ -84,8 +84,8 @@ func TestAccProjectResource_description(t *testing.T) {
 	testUpdatedProject.Description = "Other description"
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProjectConfigDescription(testDependencyTrack, projectName, testProject.Description),
@@ -121,8 +121,8 @@ func TestAccProjectResource_inactive(t *testing.T) {
 	testUpdatedProject.Active = true
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProjectConfigActivity(testDependencyTrack, projectName, testProject.Active),
@@ -158,8 +158,8 @@ func TestAccProjectResource_classifier(t *testing.T) {
 	testUpdatedProject.Classifier = "DEVICE"
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProjectConfigClassifier(testDependencyTrack, testProject.Name, testProject.Classifier),
@@ -200,8 +200,8 @@ func TestAccProjectResource_parent(t *testing.T) {
 	var parentProjectID, otherParentProjectID string
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProjectConfigParent(testDependencyTrack, projectName),
