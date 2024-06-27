@@ -33,6 +33,7 @@ func TestAccProjectResource_basic(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
 	projectName := acctest.RandomWithPrefix("test-project")
+	otherProjectName := acctest.RandomWithPrefix("other-test-project")
 	projectResourceName := createProjectResourceName("test")
 
 	testProject := dtrack.Project{
@@ -40,6 +41,9 @@ func TestAccProjectResource_basic(t *testing.T) {
 		Classifier: "APPLICATION",
 		Active:     true,
 	}
+
+	testUpdatedProject := testProject
+	testUpdatedProject.Name = otherProjectName
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
@@ -61,6 +65,13 @@ func TestAccProjectResource_basic(t *testing.T) {
 				ResourceName:      projectResourceName,
 				ImportState:       true,
 				ImportStateVerify: true,
+			},
+			{
+				Config: testAccProjectConfigBasic(testDependencyTrack, otherProjectName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					resource.TestCheckResourceAttr(projectResourceName, "name", otherProjectName),
+				),
 			},
 		},
 		CheckDestroy: testAccCheckProjectDoesNotExists(ctx, testDependencyTrack, projectResourceName),
