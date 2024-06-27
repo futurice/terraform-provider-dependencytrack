@@ -32,10 +32,11 @@ func TestMain(m *testing.M) {
 func TestAccProjectResource_basic(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
+	projectName := acctest.RandomWithPrefix("test-project")
 	projectResourceName := createProjectResourceName("test")
 
 	testProject := dtrack.Project{
-		Name:       acctest.RandomWithPrefix("test-project"),
+		Name:       projectName,
 		Classifier: "APPLICATION",
 		Active:     true,
 	}
@@ -45,11 +46,11 @@ func TestAccProjectResource_basic(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccProjectConfigBasic(testDependencyTrack, testProject.Name),
+				Config: testAccProjectConfigBasic(testDependencyTrack, projectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
 					resource.TestCheckResourceAttrSet(projectResourceName, "id"),
-					resource.TestCheckResourceAttr(projectResourceName, "name", testProject.Name),
+					resource.TestCheckResourceAttr(projectResourceName, "name", projectName),
 					resource.TestCheckResourceAttr(projectResourceName, "classifier", testProject.Classifier),
 					resource.TestCheckNoResourceAttr(projectResourceName, "description"),
 					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(testProject.Active)),
@@ -69,24 +70,35 @@ func TestAccProjectResource_basic(t *testing.T) {
 func TestAccProjectResource_description(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
+	projectName := acctest.RandomWithPrefix("test-project")
 	projectResourceName := createProjectResourceName("test")
 
 	testProject := dtrack.Project{
-		Name:        acctest.RandomWithPrefix("test-project"),
+		Name:        projectName,
 		Classifier:  "APPLICATION",
 		Description: "Description",
 		Active:      true,
 	}
+
+	testUpdatedProject := testProject
+	testUpdatedProject.Description = "Other description"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccProjectConfigDescription(testDependencyTrack, testProject.Name, testProject.Description),
+				Config: testAccProjectConfigDescription(testDependencyTrack, projectName, testProject.Description),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
 					resource.TestCheckResourceAttr(projectResourceName, "description", testProject.Description),
+				),
+			},
+			{
+				Config: testAccProjectConfigDescription(testDependencyTrack, projectName, testUpdatedProject.Description),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					resource.TestCheckResourceAttr(projectResourceName, "description", testUpdatedProject.Description),
 				),
 			},
 		},
@@ -96,23 +108,71 @@ func TestAccProjectResource_description(t *testing.T) {
 func TestAccProjectResource_inactive(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
+	projectName := acctest.RandomWithPrefix("test-project")
 	projectResourceName := createProjectResourceName("test")
 
 	testProject := dtrack.Project{
-		Name:       acctest.RandomWithPrefix("test-project"),
+		Name:       projectName,
 		Classifier: "APPLICATION",
 		Active:     false,
 	}
+
+	testUpdatedProject := testProject
+	testUpdatedProject.Active = true
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccProjectConfigInactive(testDependencyTrack, testProject.Name),
+				Config: testAccProjectConfigActivity(testDependencyTrack, projectName, testProject.Active),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
-					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(false)),
+					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(testProject.Active)),
+				),
+			},
+			{
+				Config: testAccProjectConfigActivity(testDependencyTrack, projectName, testUpdatedProject.Active),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(testUpdatedProject.Active)),
+				),
+			},
+		},
+	})
+}
+
+func TestAccProjectResource_classifier(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
+
+	projectName := acctest.RandomWithPrefix("test-project")
+	projectResourceName := createProjectResourceName("test")
+
+	testProject := dtrack.Project{
+		Name:       projectName,
+		Classifier: "CONTAINER",
+		Active:     true,
+	}
+
+	testUpdatedProject := testProject
+	testUpdatedProject.Classifier = "DEVICE"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectConfigClassifier(testDependencyTrack, testProject.Name, testProject.Classifier),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					resource.TestCheckResourceAttr(projectResourceName, "classifier", testProject.Classifier),
+				),
+			},
+			{
+				Config: testAccProjectConfigClassifier(testDependencyTrack, testProject.Name, testUpdatedProject.Classifier),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					resource.TestCheckResourceAttr(projectResourceName, "classifier", testUpdatedProject.Classifier),
 				),
 			},
 		},
@@ -122,8 +182,9 @@ func TestAccProjectResource_inactive(t *testing.T) {
 func TestAccProjectResource_parent(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
-	childProjectResourceName := createProjectResourceName("test")
+	projectResourceName := createProjectResourceName("test")
 	parentProjectResourceName := createProjectResourceName("parent")
+	otherParentProjectResourceName := createProjectResourceName("other_parent")
 
 	projectName := acctest.RandomWithPrefix("test-project")
 
@@ -136,7 +197,7 @@ func TestAccProjectResource_parent(t *testing.T) {
 		}
 	}
 
-	var parentProjectID string
+	var parentProjectID, otherParentProjectID string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -146,8 +207,16 @@ func TestAccProjectResource_parent(t *testing.T) {
 				Config: testAccProjectConfigParent(testDependencyTrack, projectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testutils.TestAccCheckGetResourceID(parentProjectResourceName, &parentProjectID),
-					testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, childProjectResourceName, func() dtrack.Project { return createTestProject(&parentProjectID) }),
-					resource.TestCheckResourceAttrPtr(childProjectResourceName, "parent_id", &parentProjectID),
+					testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, projectResourceName, func() dtrack.Project { return createTestProject(&parentProjectID) }),
+					resource.TestCheckResourceAttrPtr(projectResourceName, "parent_id", &parentProjectID),
+				),
+			},
+			{
+				Config: testAccProjectConfigOtherParent(testDependencyTrack, projectName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testutils.TestAccCheckGetResourceID(otherParentProjectResourceName, &otherParentProjectID),
+					testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, projectResourceName, func() dtrack.Project { return createTestProject(&otherParentProjectID) }),
+					resource.TestCheckResourceAttrPtr(projectResourceName, "parent_id", &otherParentProjectID),
 				),
 			},
 		},
@@ -182,16 +251,29 @@ resource "dependencytrack_project" "test" {
 	)
 }
 
-func testAccProjectConfigInactive(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
+func testAccProjectConfigActivity(testDependencyTrack *testutils.TestDependencyTrack, projectName string, active bool) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		fmt.Sprintf(`
 resource "dependencytrack_project" "test" {
 	name        = %[1]q
 	classifier  = "APPLICATION"
-	active		= false
+	active		= %[2]t
 }
 `,
-			projectName,
+			projectName, active,
+		),
+	)
+}
+
+func testAccProjectConfigClassifier(testDependencyTrack *testutils.TestDependencyTrack, projectName, classifier string) string {
+	return testDependencyTrack.AddProviderConfiguration(
+		fmt.Sprintf(`
+resource "dependencytrack_project" "test" {
+	name        = %[1]q
+	classifier  = %[2]q
+}
+`,
+			projectName, classifier,
 		),
 	)
 }
@@ -214,6 +296,41 @@ resource "dependencytrack_project" "test" {
 	name        	= %[1]q
 	classifier  	= "APPLICATION"
 	parent_id		= dependencytrack_project.parent.id
+}
+`,
+				projectName,
+			),
+		),
+	)
+}
+
+func testAccProjectConfigOtherParent(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
+	parentProjectName := fmt.Sprintf("parent-%s", projectName)
+	otherParentProjectName := fmt.Sprintf("other-parent-%s", projectName)
+
+	return testDependencyTrack.AddProviderConfiguration(
+		testutils.ComposeConfigs(
+			fmt.Sprintf(`
+resource "dependencytrack_project" "parent" {
+	name        = %[1]q
+	classifier  = "APPLICATION"
+}
+`,
+				parentProjectName,
+			),
+			fmt.Sprintf(`
+resource "dependencytrack_project" "other_parent" {
+	name        = %[1]q
+	classifier  = "APPLICATION"
+}
+`,
+				otherParentProjectName,
+			),
+			fmt.Sprintf(`
+resource "dependencytrack_project" "test" {
+	name        	= %[1]q
+	classifier  	= "APPLICATION"
+	parent_id		= dependencytrack_project.other_parent.id
 }
 `,
 				projectName,
