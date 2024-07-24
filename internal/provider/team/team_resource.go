@@ -1,14 +1,11 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package team
 
 import (
 	"context"
 	"fmt"
-
 	dtrack "github.com/futurice/dependency-track-client-go"
-	"github.com/google/uuid"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -81,40 +78,47 @@ func (r *TeamResource) Configure(ctx context.Context, req resource.ConfigureRequ
 }
 
 func (r *TeamResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan TeamResourceModel
+	var plan, state TeamResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	team := dtrack.Team{
-		Name: plan.Name.ValueString(),
+	dtTeam, diags := TFTeamToDTTeam(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	respTeam, err := r.client.Team.Create(ctx, team)
+	respTeam, err := r.client.Team.Create(ctx, dtTeam)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create API key, got error: %s", err))
 		return
 	}
 
-	plan.ID = types.StringValue(respTeam.UUID.String())
-	plan.Name = types.StringValue(respTeam.Name)
+	state, diags = DTTeamToTFTeam(ctx, respTeam)
+	resp.Diagnostics.Append(diags...)
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *TeamResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state TeamResourceModel
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	respTeam, err := r.client.Team.Get(ctx, uuid.MustParse(state.ID.ValueString()))
+	teamUUID, teamUUIDDiags := utils.ParseUUID(state.ID.ValueString())
+	resp.Diagnostics.Append(teamUUIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	respTeam, err := r.client.Team.Get(ctx, teamUUID)
 	if err != nil {
 		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -125,8 +129,8 @@ func (r *TeamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	state.ID = types.StringValue(respTeam.UUID.String())
-	state.Name = types.StringValue(respTeam.Name)
+	state, diags = DTTeamToTFTeam(ctx, respTeam)
+	resp.Diagnostics.Append(diags...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -136,24 +140,24 @@ func (r *TeamResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	team := dtrack.Team{
-		Name: plan.Name.ValueString(),
-		UUID: uuid.MustParse(state.ID.ValueString()),
+	dtTeam, diags := TFTeamToDTTeam(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	respTeam, err := r.client.Team.Update(ctx, team)
+	respTeam, err := r.client.Team.Update(ctx, dtTeam)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update team, got error: %s", err))
 		return
 	}
 
-	state.ID = types.StringValue(respTeam.UUID.String())
-	state.Name = types.StringValue(respTeam.Name)
+	state, diags = DTTeamToTFTeam(ctx, respTeam)
+	resp.Diagnostics.Append(diags...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -162,16 +166,17 @@ func (r *TeamResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	var state TeamResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	team := dtrack.Team{
-		UUID: uuid.MustParse(state.ID.ValueString()),
+	dtTeam, diags := TFTeamToDTTeam(ctx, state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	err := r.client.Team.Delete(ctx, team)
+	err := r.client.Team.Delete(ctx, dtTeam)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete team, got error: %s", err))
 		return
@@ -182,4 +187,29 @@ func (r *TeamResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 func (r *TeamResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func DTTeamToTFTeam(ctx context.Context, dtTeam dtrack.Team) (TeamResourceModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	team := TeamResourceModel{
+		ID:   types.StringValue(dtTeam.UUID.String()),
+		Name: types.StringValue(dtTeam.Name),
+	}
+
+	return team, diags
+}
+
+func TFTeamToDTTeam(ctx context.Context, tfTeam TeamResourceModel) (dtrack.Team, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	team := dtrack.Team{
+		Name: tfTeam.Name.ValueString(),
+	}
+
+	if tfTeam.ID.ValueString() != "" {
+		teamUUID, teamUUIDDiags := utils.ParseUUID(tfTeam.ID.ValueString())
+		team.UUID = teamUUID
+		diags.Append(teamUUIDDiags...)
+	}
+
+	return team, diags
 }
