@@ -6,11 +6,10 @@ package teamapikey
 import (
 	"context"
 	"fmt"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
-	"github.com/google/uuid"
-
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -86,12 +85,17 @@ func (r *TeamAPIKeyResource) Create(ctx context.Context, req resource.CreateRequ
 	var plan TeamAPIKeyResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	apiKey, err := r.client.Team.GenerateAPIKey(ctx, uuid.MustParse(plan.TeamID.String()))
+	teamUUID, teamUUIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	resp.Diagnostics.Append(teamUUIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	apiKey, err := r.client.Team.GenerateAPIKey(ctx, teamUUID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create API key, got error: %s", err))
 		return
@@ -106,7 +110,6 @@ func (r *TeamAPIKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 	var state TeamAPIKeyResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -148,7 +151,6 @@ func (r *TeamAPIKeyResource) Delete(ctx context.Context, req resource.DeleteRequ
 	var state TeamAPIKeyResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
