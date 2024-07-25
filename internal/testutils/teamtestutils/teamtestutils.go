@@ -2,7 +2,6 @@ package teamtestutils
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
@@ -82,6 +81,44 @@ func TestAccCheckTeamHasExpectedPermissions(ctx context.Context, testDependencyT
 	}
 }
 
+func TestAccCheckTeamHasNoAPIKeys(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		team, err := FindTeamByResourceName(ctx, testDependencyTrack, state, resourceName)
+		if err != nil {
+			return err
+		}
+		if team == nil {
+			return fmt.Errorf("team for resource %s does not exist in Dependency-Track", resourceName)
+		}
+
+		if len(team.APIKeys) != 0 {
+			return fmt.Errorf("team for resource %s has %d API keys instead of the expected 0", resourceName, len(team.APIKeys))
+		}
+
+		return nil
+	}
+}
+
+func TestAccCheckGetTeamSingleAPIKey(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, apiKeyTarget *string) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		team, err := FindTeamByResourceName(ctx, testDependencyTrack, state, resourceName)
+		if err != nil {
+			return err
+		}
+		if team == nil {
+			return fmt.Errorf("team for resource %s does not exist in Dependency-Track", resourceName)
+		}
+
+		if len(team.APIKeys) != 1 {
+			return fmt.Errorf("team for resource %s has %d API keys instead of the expected 1", resourceName, len(team.APIKeys))
+		}
+
+		*apiKeyTarget = team.APIKeys[0].Key
+
+		return nil
+	}
+}
+
 func FindTeamByResourceName(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, state *terraform.State, resourceName string) (*dtrack.Team, error) {
 	teamID, err := testutils.GetResourceID(state, resourceName)
 	if err != nil {
@@ -97,23 +134,31 @@ func FindTeamByResourceName(ctx context.Context, testDependencyTrack *testutils.
 }
 
 func FindTeam(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, teamID uuid.UUID) (*dtrack.Team, error) {
-	team, err := testDependencyTrack.Client.Team.Get(ctx, teamID)
+	// Currently the endpoint for getting one team does not return most of the data
+	//   see https://github.com/DependencyTrack/dependency-track/issues/4000
+	teams, err := testDependencyTrack.Client.Team.GetAll(ctx, dtrack.PageOptions{})
 	if err != nil {
-		var apiErr *dtrack.APIError
-		ok := errors.As(err, &apiErr)
-		if !ok || apiErr.StatusCode != 404 {
-			return nil, fmt.Errorf("failed to get team from Dependency-Track: %w", err)
+		return nil, fmt.Errorf("failed to get teams from Dependency-Track: %w", err)
+	}
+
+	for _, team := range teams.Items {
+		if team.UUID == teamID {
+			// normalize the returned object not to contain empty array references
+			if len(team.Permissions) == 0 {
+				team.Permissions = nil
+			}
+			if len(team.APIKeys) == 0 {
+				team.APIKeys = nil
+			}
+			if len(team.MappedOIDCGroups) == 0 {
+				team.MappedOIDCGroups = nil
+			}
+
+			return &team, nil
 		}
-
-		return nil, nil
 	}
 
-	// normalize the returned object not to contain an empty array reference
-	if len(team.Permissions) == 0 {
-		team.Permissions = nil
-	}
-
-	return &team, nil
+	return nil, nil
 }
 
 func CreateTeamResourceName(localName string) string {
@@ -122,4 +167,8 @@ func CreateTeamResourceName(localName string) string {
 
 func CreateTeamPermissionResourceName(localName string) string {
 	return fmt.Sprintf("dependencytrack_team_permission.%s", localName)
+}
+
+func CreateTeamAPIKeyResourceName(localName string) string {
+	return fmt.Sprintf("dependencytrack_team_api_key.%s", localName)
 }
