@@ -19,3 +19,7 @@ Team permission
 
 - `name` (String) Name of the permission
 - `team_id` (String) ID of the team
+
+### Read-Only
+
+- `id` (String) Synthetic permission ID in the form of team_id/permission_name

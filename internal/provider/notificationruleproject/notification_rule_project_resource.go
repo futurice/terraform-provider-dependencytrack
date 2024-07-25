@@ -165,7 +165,7 @@ func (r *NotificationRuleProjectResource) Delete(ctx context.Context, req resour
 func (r *NotificationRuleProjectResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, "/")
 	if len(parts) != 2 {
-		resp.Diagnostics.AddError("Invalid import ID", "Expected ID in the format 'project_id/rule_id'")
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("Expected ID in the format 'project_id/rule_id', got [%s]", req.ID))
 		return
 	}
 
