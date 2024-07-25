@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestAccTeamResource_basic(t *testing.T) {
+func TestAccTeamPermissionResource_basic(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
 	teamName := acctest.RandomWithPrefix("test-team")

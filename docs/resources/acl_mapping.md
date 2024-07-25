@@ -19,3 +19,7 @@ ACL mapping
 
 - `project_id` (String) Project UUID
 - `team_id` (String) Team UUID
+
+### Read-Only
+
+- `id` (String) Synthetic ACL mapping ID in the form of team_id/project_id

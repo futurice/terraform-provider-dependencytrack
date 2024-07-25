@@ -81,6 +81,40 @@ func TestAccCheckTeamHasExpectedPermissions(ctx context.Context, testDependencyT
 	}
 }
 
+func TestAccCheckTeamHasExpectedACLMappings(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedACLMappingProjectIDs []*string) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		team, err := FindTeamByResourceName(ctx, testDependencyTrack, state, resourceName)
+		if err != nil {
+			return err
+		}
+		if team == nil {
+			return fmt.Errorf("team for resource %s does not exist in Dependency-Track", resourceName)
+		}
+
+		aclMappings, err := testDependencyTrack.Client.ACLMapping.Get(ctx, team.UUID)
+		if err != nil {
+			return err
+		}
+
+		if len(aclMappings) != len(expectedACLMappingProjectIDs) {
+			return fmt.Errorf("team for resource %s has %d permissions instead of the expected %d", resourceName, len(aclMappings), len(expectedACLMappingProjectIDs))
+		}
+
+		actualACLMappingProjectIDs := make([]string, len(aclMappings))
+		for i, aclMapping := range aclMappings {
+			actualACLMappingProjectIDs[i] = aclMapping.UUID.String()
+		}
+
+		for _, expectedACLMappingProjectID := range expectedACLMappingProjectIDs {
+			if !slices.Contains(actualACLMappingProjectIDs, *expectedACLMappingProjectID) {
+				return fmt.Errorf("team for resource %s is missing expected permission %s, got [%v]", resourceName, *expectedACLMappingProjectID, actualACLMappingProjectIDs)
+			}
+		}
+
+		return nil
+	}
+}
+
 func TestAccCheckTeamHasNoAPIKeys(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string) resource.TestCheckFunc {
 	return func(state *terraform.State) error {
 		team, err := FindTeamByResourceName(ctx, testDependencyTrack, state, resourceName)
@@ -171,4 +205,8 @@ func CreateTeamPermissionResourceName(localName string) string {
 
 func CreateTeamAPIKeyResourceName(localName string) string {
 	return fmt.Sprintf("dependencytrack_team_api_key.%s", localName)
+}
+
+func CreateACLMappingResourceName(localName string) string {
+	return fmt.Sprintf("dependencytrack_acl_mapping.%s", localName)
 }

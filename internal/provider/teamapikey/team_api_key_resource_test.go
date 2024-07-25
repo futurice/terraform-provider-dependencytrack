@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestAccTeamResource_basic(t *testing.T) {
+func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
 	teamName := acctest.RandomWithPrefix("test-team")
@@ -67,14 +67,14 @@ func TestAccTeamResource_basic(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccTeamPermissionConfigNoAPIKey(testDependencyTrack, teamName),
+				Config: testAccTeamAPIKeyConfigNoAPIKey(testDependencyTrack, teamName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					teamtestutils.TestAccCheckTeamHasNoAPIKeys(ctx, testDependencyTrack, teamResourceName),
 					teamtestutils.TestAccCheckTeamHasNoAPIKeys(ctx, testDependencyTrack, otherTeamResourceName),
 				),
 			},
 		},
-		// CheckDestroy is not practical here since the team is destroyed as well, and we can no longer query its permissions
+		// CheckDestroy is not practical here since the team is destroyed as well, and we can no longer query its API Keys
 	})
 }
 
@@ -123,7 +123,7 @@ resource "dependencytrack_team_api_key" "test" {
 	)
 }
 
-func testAccTeamPermissionConfigNoAPIKey(testDependencyTrack *testutils.TestDependencyTrack, teamName string) string {
+func testAccTeamAPIKeyConfigNoAPIKey(testDependencyTrack *testutils.TestDependencyTrack, teamName string) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		testutils.ComposeConfigs(
 			fmt.Sprintf(`
