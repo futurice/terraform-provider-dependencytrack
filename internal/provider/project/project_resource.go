@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
-	dtrack "github.com/futurice/dependency-track-client-go"
-	"github.com/google/uuid"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 
+	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -120,13 +120,15 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 	var plan, state ProjectResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	dtProject, diags := TFProjectToDTProject(ctx, plan)
 	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	respProject, err := r.client.Project.Create(ctx, dtProject)
 	if err != nil {
@@ -157,12 +159,17 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	respProject, err := r.client.Project.Get(ctx, uuid.MustParse(state.ID.ValueString()))
+	projectID, projectIDDiags := utils.ParseAttributeUUID(state.ID.ValueString(), "id")
+	resp.Diagnostics.Append(projectIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	respProject, err := r.client.Project.Get(ctx, projectID)
 	if err != nil {
 		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -184,13 +191,15 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	dtProject, diags := TFProjectToDTProject(ctx, plan)
 	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	respProject, err := r.client.Project.Update(ctx, dtProject)
 	if err != nil {
@@ -211,12 +220,17 @@ func (r *ProjectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	var state ProjectResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.client.Project.Delete(ctx, uuid.MustParse(state.ID.ValueString()))
+	projectID, projectIDDiags := utils.ParseAttributeUUID(state.ID.ValueString(), "id")
+	resp.Diagnostics.Append(projectIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.client.Project.Delete(ctx, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete project, got error: %s", err))
 		return
@@ -255,6 +269,7 @@ func DTProjectToTFProject(ctx context.Context, dtProject dtrack.Project) (Projec
 
 func TFProjectToDTProject(ctx context.Context, tfProject ProjectResourceModel) (dtrack.Project, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
 	project := dtrack.Project{
 		Name:        tfProject.Name.ValueString(),
 		Classifier:  tfProject.Classifier.ValueString(),
@@ -263,11 +278,15 @@ func TFProjectToDTProject(ctx context.Context, tfProject ProjectResourceModel) (
 	}
 
 	if tfProject.ID.ValueString() != "" {
-		project.UUID = uuid.MustParse(tfProject.ID.ValueString())
+		projectID, projectIDDiags := utils.ParseAttributeUUID(tfProject.ID.ValueString(), "id")
+		project.UUID = projectID
+		diags.Append(projectIDDiags...)
 	}
 
 	if !tfProject.ParentID.IsNull() {
-		project.ParentRef = &dtrack.ParentRef{UUID: uuid.MustParse(tfProject.ParentID.ValueString())}
+		parentProjectID, parentProjectIDDiags := utils.ParseAttributeUUID(tfProject.ParentID.ValueString(), "parent_id")
+		project.ParentRef = &dtrack.ParentRef{UUID: parentProjectID}
+		diags.Append(parentProjectIDDiags...)
 	}
 
 	return project, diags

@@ -112,7 +112,7 @@ func (r *TeamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(state.ID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(state.ID.ValueString(), "id")
 	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -206,7 +206,7 @@ func TFTeamToDTTeam(ctx context.Context, tfTeam TeamResourceModel) (dtrack.Team,
 	}
 
 	if tfTeam.ID.ValueString() != "" {
-		teamID, teamIDDiags := utils.ParseUUID(tfTeam.ID.ValueString())
+		teamID, teamIDDiags := utils.ParseAttributeUUID(tfTeam.ID.ValueString(), "id")
 		team.UUID = teamID
 		diags.Append(teamIDDiags...)
 	}

@@ -89,7 +89,7 @@ func (r *TeamPermissionResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(plan.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -129,7 +129,7 @@ func (r *TeamPermissionResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(state.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -171,10 +171,10 @@ func (r *TeamPermissionResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	newTeamID, newTeamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	newTeamID, newTeamIDDiags := utils.ParseAttributeUUID(plan.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(newTeamIDDiags...)
 
-	oldTeamID, oldTeamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	oldTeamID, oldTeamIDDiags := utils.ParseAttributeUUID(state.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(oldTeamIDDiags...)
 
 	if resp.Diagnostics.HasError() {
@@ -216,7 +216,7 @@ func (r *TeamPermissionResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(state.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
