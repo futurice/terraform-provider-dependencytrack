@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/google/uuid"
-
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -32,6 +32,7 @@ type ACLMappingResource struct {
 
 // ACLResourceModel describes the resource data model.
 type ACLResourceModel struct {
+	ID        types.String `tfsdk:"id"`
 	TeamID    types.String `tfsdk:"team_id"`
 	ProjectID types.String `tfsdk:"project_id"`
 }
@@ -52,6 +53,10 @@ func (r *ACLMappingResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"project_id": schema.StringAttribute{
 				MarkdownDescription: "Project UUID",
 				Required:            true,
+			},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Synthetic ACL mapping ID in the form of team_id/project_id",
+				Computed:            true,
 			},
 		},
 	}
@@ -77,17 +82,26 @@ func (r *ACLMappingResource) Configure(ctx context.Context, req resource.Configu
 }
 
 func (r *ACLMappingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ACLResourceModel
+	var plan, state ACLResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	teamID, teamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	resp.Diagnostics.Append(teamIDDiags...)
+
+	projectID, projectIDDiags := utils.ParseUUID(plan.ProjectID.ValueString())
+	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	mapping := dtrack.ACLMapping{
-		Team:    uuid.MustParse(plan.TeamID.ValueString()),
-		Project: uuid.MustParse(plan.ProjectID.ValueString()),
+		Team:    teamID,
+		Project: projectID,
 	}
 
 	err := r.client.ACLMapping.Create(ctx, mapping)
@@ -96,19 +110,32 @@ func (r *ACLMappingResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	state.ID = types.StringValue(makeACLMappingID(teamID, projectID))
+	state.TeamID = types.StringValue(teamID.String())
+	state.ProjectID = types.StringValue(projectID.String())
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *ACLMappingResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state ACLResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	teamID, teamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	resp.Diagnostics.Append(teamIDDiags...)
+
+	projectID, projectIDDiags := utils.ParseUUID(state.ProjectID.ValueString())
+	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	projectMappings, err := r.client.ACLMapping.Get(ctx, uuid.MustParse(state.TeamID.ValueString()))
+	projectMappings, err := r.client.ACLMapping.Get(ctx, teamID)
 	if err != nil {
 		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -119,7 +146,6 @@ func (r *ACLMappingResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	projectID := uuid.MustParse(state.ProjectID.ValueString())
 	found := false
 	for _, project := range projectMappings {
 		if project.UUID == projectID {
@@ -141,32 +167,51 @@ func (r *ACLMappingResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	oldTeamID, oldTeamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	resp.Diagnostics.Append(oldTeamIDDiags...)
+
+	oldProjectID, oldProjectIDDiags := utils.ParseUUID(state.ProjectID.ValueString())
+	resp.Diagnostics.Append(oldProjectIDDiags...)
+
+	newTeamID, newTeamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	resp.Diagnostics.Append(newTeamIDDiags...)
+
+	newProjectID, newProjectIDDiags := utils.ParseUUID(plan.ProjectID.ValueString())
+	resp.Diagnostics.Append(newProjectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	newMapping := dtrack.ACLMapping{
-		Team:    uuid.MustParse(plan.TeamID.ValueString()),
-		Project: uuid.MustParse(plan.ProjectID.ValueString()),
+		Team:    newTeamID,
+		Project: newProjectID,
 	}
 
 	oldMapping := dtrack.ACLMapping{
-		Team:    uuid.MustParse(state.TeamID.ValueString()),
-		Project: uuid.MustParse(state.ProjectID.ValueString()),
+		Team:    oldTeamID,
+		Project: oldProjectID,
 	}
 
 	err := r.client.ACLMapping.Create(ctx, newMapping)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update ACL mapping, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create new ACL mapping, got error: %s", err))
 		return
 	}
 
 	err = r.client.ACLMapping.Delete(ctx, oldMapping)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update ACL mapping, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete old ACL mapping, got error: %s", err))
 		return
 	}
+
+	state.ID = types.StringValue(makeACLMappingID(newTeamID, newProjectID))
+	state.TeamID = types.StringValue(newTeamID.String())
+	state.ProjectID = types.StringValue(newProjectID.String())
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -175,14 +220,23 @@ func (r *ACLMappingResource) Delete(ctx context.Context, req resource.DeleteRequ
 	var state ACLResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	teamID, teamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	resp.Diagnostics.Append(teamIDDiags...)
+
+	projectID, projectIDDiags := utils.ParseUUID(state.ProjectID.ValueString())
+	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	mapping := dtrack.ACLMapping{
-		Team:    uuid.MustParse(state.TeamID.ValueString()),
-		Project: uuid.MustParse(state.ProjectID.ValueString()),
+		Team:    teamID,
+		Project: projectID,
 	}
 
 	err := r.client.ACLMapping.Delete(ctx, mapping)
@@ -201,6 +255,11 @@ func (r *ACLMappingResource) ImportState(ctx context.Context, req resource.Impor
 		return
 	}
 
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("team_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), parts[1])...)
+}
+
+func makeACLMappingID(teamID uuid.UUID, projectID uuid.UUID) string {
+	return fmt.Sprintf("%s/%s", teamID.String(), projectID.String())
 }

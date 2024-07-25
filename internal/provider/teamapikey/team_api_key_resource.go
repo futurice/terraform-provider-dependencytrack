@@ -89,13 +89,13 @@ func (r *TeamAPIKeyResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	teamUUID, teamUUIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
-	resp.Diagnostics.Append(teamUUIDDiags...)
+	teamID, teamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	apiKey, err := r.client.Team.GenerateAPIKey(ctx, teamUUID)
+	apiKey, err := r.client.Team.GenerateAPIKey(ctx, teamID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create API key, got error: %s", err))
 		return

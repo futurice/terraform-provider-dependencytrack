@@ -112,13 +112,13 @@ func (r *TeamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	teamUUID, teamUUIDDiags := utils.ParseUUID(state.ID.ValueString())
-	resp.Diagnostics.Append(teamUUIDDiags...)
+	teamID, teamIDDiags := utils.ParseUUID(state.ID.ValueString())
+	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	respTeam, err := r.client.Team.Get(ctx, teamUUID)
+	respTeam, err := r.client.Team.Get(ctx, teamID)
 	if err != nil {
 		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -206,9 +206,9 @@ func TFTeamToDTTeam(ctx context.Context, tfTeam TeamResourceModel) (dtrack.Team,
 	}
 
 	if tfTeam.ID.ValueString() != "" {
-		teamUUID, teamUUIDDiags := utils.ParseUUID(tfTeam.ID.ValueString())
-		team.UUID = teamUUID
-		diags.Append(teamUUIDDiags...)
+		teamID, teamIDDiags := utils.ParseUUID(tfTeam.ID.ValueString())
+		team.UUID = teamID
+		diags.Append(teamIDDiags...)
 	}
 
 	return team, diags
