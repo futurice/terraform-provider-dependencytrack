@@ -89,7 +89,7 @@ func (r *TeamAPIKeyResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(plan.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return

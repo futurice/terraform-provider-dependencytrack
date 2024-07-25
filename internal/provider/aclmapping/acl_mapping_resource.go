@@ -89,10 +89,10 @@ func (r *ACLMappingResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(plan.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(teamIDDiags...)
 
-	projectID, projectIDDiags := utils.ParseUUID(plan.ProjectID.ValueString())
+	projectID, projectIDDiags := utils.ParseAttributeUUID(plan.ProjectID.ValueString(), "project_id")
 	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
@@ -125,10 +125,10 @@ func (r *ACLMappingResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(state.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(teamIDDiags...)
 
-	projectID, projectIDDiags := utils.ParseUUID(state.ProjectID.ValueString())
+	projectID, projectIDDiags := utils.ParseAttributeUUID(state.ProjectID.ValueString(), "project_id")
 	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
@@ -171,16 +171,16 @@ func (r *ACLMappingResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	oldTeamID, oldTeamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	oldTeamID, oldTeamIDDiags := utils.ParseAttributeUUID(state.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(oldTeamIDDiags...)
 
-	oldProjectID, oldProjectIDDiags := utils.ParseUUID(state.ProjectID.ValueString())
+	oldProjectID, oldProjectIDDiags := utils.ParseAttributeUUID(state.ProjectID.ValueString(), "project_id")
 	resp.Diagnostics.Append(oldProjectIDDiags...)
 
-	newTeamID, newTeamIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	newTeamID, newTeamIDDiags := utils.ParseAttributeUUID(plan.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(newTeamIDDiags...)
 
-	newProjectID, newProjectIDDiags := utils.ParseUUID(plan.ProjectID.ValueString())
+	newProjectID, newProjectIDDiags := utils.ParseAttributeUUID(plan.ProjectID.ValueString(), "project_id")
 	resp.Diagnostics.Append(newProjectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
@@ -224,10 +224,10 @@ func (r *ACLMappingResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	teamID, teamIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	teamID, teamIDDiags := utils.ParseAttributeUUID(state.TeamID.ValueString(), "team_id")
 	resp.Diagnostics.Append(teamIDDiags...)
 
-	projectID, projectIDDiags := utils.ParseUUID(state.ProjectID.ValueString())
+	projectID, projectIDDiags := utils.ParseAttributeUUID(state.ProjectID.ValueString(), "project_id")
 	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {

@@ -7,12 +7,11 @@ import (
 	"context"
 	"fmt"
 
-	dtrack "github.com/futurice/dependency-track-client-go"
-	"github.com/google/uuid"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 
+	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -90,19 +89,12 @@ func (d *TeamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	var model TeamDataSourceModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &model)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	teamID, err := uuid.Parse(model.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("id"),
-			"Invalid team ID",
-			"Team ID has to be a valid UUID.",
-		)
-	}
-
+	teamID, teamIDDiags := utils.ParseAttributeUUID(model.ID.ValueString(), "id")
+	resp.Diagnostics.Append(teamIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
