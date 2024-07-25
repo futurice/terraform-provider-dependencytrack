@@ -194,7 +194,7 @@ func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConf
 
 func startDependencyTrackContainer(ctx context.Context) (testcontainers.Container, error) {
 	containerRequest := testcontainers.ContainerRequest{
-		Image:        "dependencytrack/apiserver:4.11.4",
+		Image:        "dependencytrack/apiserver:4.11.5",
 		ExposedPorts: []string{"8080/tcp"},
 		WaitingFor:   wait.ForLog("Dependency-Track is ready").WithStartupTimeout(2 * time.Minute),
 	}
