@@ -6,11 +6,11 @@ package teampermission
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
-	"github.com/google/uuid"
-
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -32,6 +32,7 @@ type TeamPermissionResource struct {
 
 // TeamPermissionResourceModel describes the resource data model.
 type TeamPermissionResourceModel struct {
+	ID     types.String `tfsdk:"id"`
 	TeamID types.String `tfsdk:"team_id"`
 	Name   types.String `tfsdk:"name"`
 }
@@ -52,6 +53,10 @@ func (r *TeamPermissionResource) Schema(ctx context.Context, req resource.Schema
 			"name": schema.StringAttribute{
 				MarkdownDescription: "Name of the permission",
 				Required:            true,
+			},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Synthetic permission ID in the form of team_id/permission_name",
+				Computed:            true,
 			},
 		},
 	}
@@ -77,10 +82,15 @@ func (r *TeamPermissionResource) Configure(ctx context.Context, req resource.Con
 }
 
 func (r *TeamPermissionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan TeamPermissionResourceModel
+	var plan, state TeamPermissionResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
+	teamUUID, teamUUIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	resp.Diagnostics.Append(teamUUIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -89,7 +99,7 @@ func (r *TeamPermissionResource) Create(ctx context.Context, req resource.Create
 		Name: plan.Name.ValueString(),
 	}
 
-	respTeam, err := r.client.Permission.AddPermissionToTeam(ctx, permission, uuid.MustParse(plan.TeamID.ValueString()))
+	_, err := r.client.Permission.AddPermissionToTeam(ctx, permission, teamUUID)
 	if err != nil {
 		if apiErr, ok := err.(*dtrack.APIError); ok {
 			switch apiErr.StatusCode {
@@ -104,21 +114,28 @@ func (r *TeamPermissionResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	plan.TeamID = types.StringValue(respTeam.UUID.String())
+	state.ID = types.StringValue(makePermissionID(teamUUID, permission.Name))
+	state.TeamID = types.StringValue(teamUUID.String())
+	state.Name = types.StringValue(permission.Name)
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *TeamPermissionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state TeamPermissionResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	respTeam, err := r.client.Team.Get(ctx, uuid.MustParse(state.TeamID.ValueString()))
+	teamUUID, teamUUIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	resp.Diagnostics.Append(teamUUIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	respTeam, err := r.client.Team.Get(ctx, teamUUID)
 	if err != nil {
 		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -150,7 +167,14 @@ func (r *TeamPermissionResource) Update(ctx context.Context, req resource.Update
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
+	newTeamUUID, newTeamUUIDDiags := utils.ParseUUID(plan.TeamID.ValueString())
+	oldTeamUUID, oldTeamUUIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	resp.Diagnostics.Append(newTeamUUIDDiags...)
+	resp.Diagnostics.Append(oldTeamUUIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -159,9 +183,9 @@ func (r *TeamPermissionResource) Update(ctx context.Context, req resource.Update
 		Name: plan.Name.ValueString(),
 	}
 
-	_, err := r.client.Permission.AddPermissionToTeam(ctx, newPermission, uuid.MustParse(state.TeamID.ValueString()))
+	_, err := r.client.Permission.AddPermissionToTeam(ctx, newPermission, newTeamUUID)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete permission, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create new permission, got error: %s", err))
 		return
 	}
 
@@ -169,12 +193,14 @@ func (r *TeamPermissionResource) Update(ctx context.Context, req resource.Update
 		Name: state.Name.ValueString(),
 	}
 
-	_, err = r.client.Permission.RemovePermissionFromTeam(ctx, oldPermission, uuid.MustParse(state.TeamID.ValueString()))
+	_, err = r.client.Permission.RemovePermissionFromTeam(ctx, oldPermission, oldTeamUUID)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete permission, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete old permission, got error: %s", err))
 		return
 	}
 
+	state.ID = types.StringValue(makePermissionID(newTeamUUID, newPermission.Name))
+	state.TeamID = types.StringValue(newTeamUUID.String())
 	state.Name = types.StringValue(newPermission.Name)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -184,7 +210,12 @@ func (r *TeamPermissionResource) Delete(ctx context.Context, req resource.Delete
 	var state TeamPermissionResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
+	teamUUID, teamUUIDDiags := utils.ParseUUID(state.TeamID.ValueString())
+	resp.Diagnostics.Append(teamUUIDDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -193,7 +224,7 @@ func (r *TeamPermissionResource) Delete(ctx context.Context, req resource.Delete
 		Name: state.Name.ValueString(),
 	}
 
-	_, err := r.client.Permission.RemovePermissionFromTeam(ctx, permission, uuid.MustParse(state.TeamID.ValueString()))
+	_, err := r.client.Permission.RemovePermissionFromTeam(ctx, permission, teamUUID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete permission, got error: %s", err))
 		return
@@ -205,10 +236,15 @@ func (r *TeamPermissionResource) Delete(ctx context.Context, req resource.Delete
 func (r *TeamPermissionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, "/")
 	if len(parts) != 2 {
-		resp.Diagnostics.AddError("Invalid import ID", "Expected ID in the format 'team_id/permission_name'")
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("Expected ID in the format 'team_id/permission_name', got [%s]", req.ID))
 		return
 	}
 
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("team_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
+}
+
+func makePermissionID(teamUUID uuid.UUID, permission string) string {
+	return fmt.Sprintf("%s/%s", teamUUID.String(), permission)
 }

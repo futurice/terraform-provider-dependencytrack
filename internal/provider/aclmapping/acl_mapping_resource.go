@@ -197,7 +197,7 @@ func (r *ACLMappingResource) Delete(ctx context.Context, req resource.DeleteRequ
 func (r *ACLMappingResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, "/")
 	if len(parts) != 2 {
-		resp.Diagnostics.AddError("Invalid import ID", "Expected ID in the format 'team_id/project_id'")
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("Expected ID in the format 'team_id/project_id', got [%s]", req.ID))
 		return
 	}
 

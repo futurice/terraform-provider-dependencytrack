@@ -1,17 +1,13 @@
 package project_test
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/projecttestutils"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"os"
 	"strconv"
 	"testing"
@@ -34,7 +30,7 @@ func TestAccProjectResource_basic(t *testing.T) {
 
 	projectName := acctest.RandomWithPrefix("test-project")
 	otherProjectName := acctest.RandomWithPrefix("other-test-project")
-	projectResourceName := createProjectResourceName("test")
+	projectResourceName := projecttestutils.CreateProjectResourceName("test")
 
 	testProject := dtrack.Project{
 		Name:       projectName,
@@ -52,7 +48,7 @@ func TestAccProjectResource_basic(t *testing.T) {
 			{
 				Config: testAccProjectConfigBasic(testDependencyTrack, projectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
 					resource.TestCheckResourceAttrSet(projectResourceName, "id"),
 					resource.TestCheckResourceAttr(projectResourceName, "name", projectName),
 					resource.TestCheckResourceAttr(projectResourceName, "classifier", testProject.Classifier),
@@ -69,12 +65,12 @@ func TestAccProjectResource_basic(t *testing.T) {
 			{
 				Config: testAccProjectConfigBasic(testDependencyTrack, otherProjectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
 					resource.TestCheckResourceAttr(projectResourceName, "name", otherProjectName),
 				),
 			},
 		},
-		CheckDestroy: testAccCheckProjectDoesNotExists(ctx, testDependencyTrack, projectResourceName),
+		CheckDestroy: projecttestutils.TestAccCheckProjectDoesNotExists(ctx, testDependencyTrack, projectResourceName),
 	})
 }
 
@@ -82,7 +78,7 @@ func TestAccProjectResource_description(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
 	projectName := acctest.RandomWithPrefix("test-project")
-	projectResourceName := createProjectResourceName("test")
+	projectResourceName := projecttestutils.CreateProjectResourceName("test")
 
 	testProject := dtrack.Project{
 		Name:        projectName,
@@ -101,14 +97,14 @@ func TestAccProjectResource_description(t *testing.T) {
 			{
 				Config: testAccProjectConfigDescription(testDependencyTrack, projectName, testProject.Description),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
 					resource.TestCheckResourceAttr(projectResourceName, "description", testProject.Description),
 				),
 			},
 			{
 				Config: testAccProjectConfigDescription(testDependencyTrack, projectName, testUpdatedProject.Description),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
 					resource.TestCheckResourceAttr(projectResourceName, "description", testUpdatedProject.Description),
 				),
 			},
@@ -120,7 +116,7 @@ func TestAccProjectResource_inactive(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
 	projectName := acctest.RandomWithPrefix("test-project")
-	projectResourceName := createProjectResourceName("test")
+	projectResourceName := projecttestutils.CreateProjectResourceName("test")
 
 	testProject := dtrack.Project{
 		Name:       projectName,
@@ -138,14 +134,14 @@ func TestAccProjectResource_inactive(t *testing.T) {
 			{
 				Config: testAccProjectConfigActivity(testDependencyTrack, projectName, testProject.Active),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
 					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(testProject.Active)),
 				),
 			},
 			{
 				Config: testAccProjectConfigActivity(testDependencyTrack, projectName, testUpdatedProject.Active),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
 					resource.TestCheckResourceAttr(projectResourceName, "active", strconv.FormatBool(testUpdatedProject.Active)),
 				),
 			},
@@ -157,7 +153,7 @@ func TestAccProjectResource_classifier(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
 	projectName := acctest.RandomWithPrefix("test-project")
-	projectResourceName := createProjectResourceName("test")
+	projectResourceName := projecttestutils.CreateProjectResourceName("test")
 
 	testProject := dtrack.Project{
 		Name:       projectName,
@@ -175,14 +171,14 @@ func TestAccProjectResource_classifier(t *testing.T) {
 			{
 				Config: testAccProjectConfigClassifier(testDependencyTrack, testProject.Name, testProject.Classifier),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testProject),
 					resource.TestCheckResourceAttr(projectResourceName, "classifier", testProject.Classifier),
 				),
 			},
 			{
 				Config: testAccProjectConfigClassifier(testDependencyTrack, testProject.Name, testUpdatedProject.Classifier),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					testAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedData(ctx, testDependencyTrack, projectResourceName, testUpdatedProject),
 					resource.TestCheckResourceAttr(projectResourceName, "classifier", testUpdatedProject.Classifier),
 				),
 			},
@@ -193,9 +189,9 @@ func TestAccProjectResource_classifier(t *testing.T) {
 func TestAccProjectResource_parent(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
 
-	projectResourceName := createProjectResourceName("test")
-	parentProjectResourceName := createProjectResourceName("parent")
-	otherParentProjectResourceName := createProjectResourceName("other_parent")
+	projectResourceName := projecttestutils.CreateProjectResourceName("test")
+	parentProjectResourceName := projecttestutils.CreateProjectResourceName("parent")
+	otherParentProjectResourceName := projecttestutils.CreateProjectResourceName("other_parent")
 
 	projectName := acctest.RandomWithPrefix("test-project")
 
@@ -218,7 +214,7 @@ func TestAccProjectResource_parent(t *testing.T) {
 				Config: testAccProjectConfigParent(testDependencyTrack, projectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testutils.TestAccCheckGetResourceID(parentProjectResourceName, &parentProjectID),
-					testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, projectResourceName, func() dtrack.Project { return createTestProject(&parentProjectID) }),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, projectResourceName, func() dtrack.Project { return createTestProject(&parentProjectID) }),
 					resource.TestCheckResourceAttrPtr(projectResourceName, "parent_id", &parentProjectID),
 				),
 			},
@@ -226,7 +222,7 @@ func TestAccProjectResource_parent(t *testing.T) {
 				Config: testAccProjectConfigOtherParent(testDependencyTrack, projectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testutils.TestAccCheckGetResourceID(otherParentProjectResourceName, &otherParentProjectID),
-					testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, projectResourceName, func() dtrack.Project { return createTestProject(&otherParentProjectID) }),
+					projecttestutils.TestAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, projectResourceName, func() dtrack.Project { return createTestProject(&otherParentProjectID) }),
 					resource.TestCheckResourceAttrPtr(projectResourceName, "parent_id", &otherParentProjectID),
 				),
 			},
@@ -348,76 +344,4 @@ resource "dependencytrack_project" "test" {
 			),
 		),
 	)
-}
-
-func testAccCheckProjectExistsAndHasExpectedData(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedProject dtrack.Project) resource.TestCheckFunc {
-	return testAccCheckProjectExistsAndHasExpectedLazyData(ctx, testDependencyTrack, resourceName, func() dtrack.Project { return expectedProject })
-}
-
-func testAccCheckProjectExistsAndHasExpectedLazyData(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedProjectCreator func() dtrack.Project) resource.TestCheckFunc {
-	return func(state *terraform.State) error {
-		expectedProject := expectedProjectCreator()
-
-		project, err := findProjectByResourceName(ctx, testDependencyTrack, state, resourceName)
-		if err != nil {
-			return err
-		}
-		if project == nil {
-			return fmt.Errorf("project for resource %s does not exist in Dependency-Track", resourceName)
-		}
-
-		diff := cmp.Diff(project, &expectedProject, cmpopts.IgnoreFields(dtrack.Project{}, "UUID", "Properties", "Tags", "Metrics"))
-		if diff != "" {
-			return fmt.Errorf("project for resource %s is different than expected: %s", resourceName, diff)
-		}
-
-		return nil
-	}
-}
-
-func testAccCheckProjectDoesNotExists(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string) resource.TestCheckFunc {
-	return func(state *terraform.State) error {
-		project, err := findProjectByResourceName(ctx, testDependencyTrack, state, resourceName)
-		if err != nil {
-			return err
-		}
-		if project != nil {
-			return fmt.Errorf("project for resource %s exists in Dependency-Track, even though it shouldn't: %v", resourceName, project)
-		}
-
-		return nil
-	}
-}
-
-func findProjectByResourceName(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, state *terraform.State, resourceName string) (*dtrack.Project, error) {
-	projectID, err := testutils.GetResourceID(state, resourceName)
-	if err != nil {
-		return nil, err
-	}
-
-	project, err := findProject(ctx, testDependencyTrack, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get project for resource %s: %w", resourceName, err)
-	}
-
-	return project, nil
-}
-
-func findProject(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, projectID uuid.UUID) (*dtrack.Project, error) {
-	project, err := testDependencyTrack.Client.Project.Get(ctx, projectID)
-	if err != nil {
-		var apiErr *dtrack.APIError
-		ok := errors.As(err, &apiErr)
-		if !ok || apiErr.StatusCode != 404 {
-			return nil, fmt.Errorf("failed to get project from Dependency-Track: %w", err)
-		}
-
-		return nil, nil
-	}
-
-	return &project, nil
-}
-
-func createProjectResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_project.%s", localName)
 }
