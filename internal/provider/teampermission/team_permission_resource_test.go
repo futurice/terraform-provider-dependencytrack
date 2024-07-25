@@ -6,8 +6,21 @@ import (
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/teamtestutils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"os"
 	"testing"
 )
+
+var testDependencyTrack *testutils.TestDependencyTrack
+
+func TestMain(m *testing.M) {
+	if os.Getenv(resource.EnvTfAcc) != "" {
+		var cleanup func()
+		testDependencyTrack, cleanup = testutils.InitTestDependencyTrack()
+		defer cleanup()
+	}
+
+	m.Run()
+}
 
 func TestAccTeamResource_basic(t *testing.T) {
 	ctx := testutils.CreateTestContext(t)
