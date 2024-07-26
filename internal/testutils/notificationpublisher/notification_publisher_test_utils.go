@@ -83,3 +83,7 @@ func FindNotificationPublisher(ctx context.Context, testDependencyTrack *testuti
 func CreateNotificationPublisherResourceName(localName string) string {
 	return fmt.Sprintf("dependencytrack_notification_publisher.%s", localName)
 }
+
+func CreateNotificationPublisherDataSourceName(localName string) string {
+	return fmt.Sprintf("data.dependencytrack_notification_publisher.%s", localName)
+}

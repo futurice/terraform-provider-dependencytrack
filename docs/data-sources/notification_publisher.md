@@ -3,12 +3,12 @@
 page_title: "dependencytrack_notification_publisher Data Source - dependencytrack"
 subcategory: ""
 description: |-
-  TODO data source
+  Notification publisher data source
 ---
 
 # dependencytrack_notification_publisher (Data Source)
 
-TODO data source
+Notification publisher data source
 
 
 
@@ -21,7 +21,8 @@ TODO data source
 
 ### Read-Only
 
-- `default_publisher` (Boolean) Whether this is the default publisher
+- `default_publisher` (Boolean) Whether this is a default publisher
+- `description` (String) Description of the publisher
 - `id` (String) Publisher UUID
 - `publisher_class` (String) Class of the publisher
 - `template` (String) Template used by the publisher

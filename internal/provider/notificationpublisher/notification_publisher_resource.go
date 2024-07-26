@@ -54,7 +54,7 @@ func (r *NotificationPublisherResource) Schema(ctx context.Context, req resource
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Name of the rule",
+				MarkdownDescription: "Name of the publisher",
 				Required:            true,
 			},
 			"id": schema.StringAttribute{
@@ -65,21 +65,26 @@ func (r *NotificationPublisherResource) Schema(ctx context.Context, req resource
 				},
 			},
 			"template_mime_type": schema.StringAttribute{
-				Required: true,
+				MarkdownDescription: "MIME type of the template",
+				Required:            true,
 			},
 			"template": schema.StringAttribute{
-				Required: true,
+				MarkdownDescription: "Template used by the publisher",
+				Required:            true,
 			},
 			"publisher_class": schema.StringAttribute{
-				Required: true,
+				MarkdownDescription: "Class of the publisher",
+				Required:            true,
 			},
 			"description": schema.StringAttribute{
-				Optional: true,
+				MarkdownDescription: "Description of the publisher",
+				Optional:            true,
 			},
 			"default_publisher": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  booldefault.StaticBool(false),
+				MarkdownDescription: "Whether this is a default publisher",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 		},
 	}

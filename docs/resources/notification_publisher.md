@@ -17,15 +17,15 @@ Notification publisher
 
 ### Required
 
-- `name` (String) Name of the rule
-- `publisher_class` (String)
-- `template` (String)
-- `template_mime_type` (String)
+- `name` (String) Name of the publisher
+- `publisher_class` (String) Class of the publisher
+- `template` (String) Template used by the publisher
+- `template_mime_type` (String) MIME type of the template
 
 ### Optional
 
-- `default_publisher` (Boolean)
-- `description` (String)
+- `default_publisher` (Boolean) Whether this is a default publisher
+- `description` (String) Description of the publisher
 
 ### Read-Only
 

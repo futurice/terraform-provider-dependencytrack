@@ -189,7 +189,7 @@ resource "dependencytrack_notification_publisher" "test" {
 	)
 }
 
-func testAccNotificationPublisherConfigDescription(testDependencyTrack *testutils.TestDependencyTrack, publisherName, publisherDescription string) string {
+func testAccNotificationPublisherConfigDescription(testDependencyTrack *testutils.TestDependencyTrack, publisherName, description string) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
@@ -200,7 +200,7 @@ resource "dependencytrack_notification_publisher" "test" {
 	description        = %[2]q
 }
 `,
-			publisherName, publisherDescription,
+			publisherName, description,
 		),
 	)
 }
