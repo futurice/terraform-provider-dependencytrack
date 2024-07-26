@@ -30,6 +30,7 @@ type NotificationPublisherDataSource struct {
 type NotificationPublisherDataSourceModel struct {
 	ID               types.String `tfsdk:"id"`
 	Name             types.String `tfsdk:"name"`
+	Description      types.String `tfsdk:"description"`
 	PublisherClass   types.String `tfsdk:"publisher_class"`
 	Template         types.String `tfsdk:"template"`
 	TemplateMimeType types.String `tfsdk:"template_mime_type"`
@@ -42,7 +43,7 @@ func (d *NotificationPublisherDataSource) Metadata(ctx context.Context, req data
 
 func (d *NotificationPublisherDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "TODO data source",
+		MarkdownDescription: "Notification publisher data source",
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
@@ -65,8 +66,12 @@ func (d *NotificationPublisherDataSource) Schema(ctx context.Context, req dataso
 				MarkdownDescription: "MIME type of the template",
 				Computed:            true,
 			},
+			"description": schema.StringAttribute{
+				MarkdownDescription: "Description of the publisher",
+				Computed:            true,
+			},
 			"default_publisher": schema.BoolAttribute{
-				MarkdownDescription: "Whether this is the default publisher",
+				MarkdownDescription: "Whether this is a default publisher",
 				Computed:            true,
 			},
 		},
@@ -110,6 +115,8 @@ func (d *NotificationPublisherDataSource) Read(ctx context.Context, req datasour
 	for _, publisher := range publishers {
 		if publisher.Name == state.Name.ValueString() {
 			state.ID = types.StringValue(publisher.UUID.String())
+			state.Name = types.StringValue(publisher.Name)
+			state.Description = types.StringValue(publisher.Description)
 			state.PublisherClass = types.StringValue(publisher.PublisherClass)
 			state.Template = types.StringValue(publisher.Template)
 			state.TemplateMimeType = types.StringValue(publisher.TemplateMimeType)
