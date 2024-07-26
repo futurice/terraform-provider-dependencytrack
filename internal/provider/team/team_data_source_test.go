@@ -6,6 +6,7 @@ import (
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/teamtestutils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -29,6 +30,19 @@ func TestAccTeamDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrPtr(teamDataSourceName, "id", &teamID),
 					resource.TestCheckResourceAttr(teamDataSourceName, "name", teamName),
 				),
+			},
+		},
+	})
+}
+
+func TestAccTeamDataSource_notFound(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccTeamDataSourceConfigNotFound(testDependencyTrack),
+				ExpectError: regexp.MustCompile("The team could not be found"),
 			},
 		},
 	})
@@ -74,6 +88,16 @@ data "dependencytrack_team" "test" {
 `,
 			teamName,
 		),
+	)
+}
+
+func testAccTeamDataSourceConfigNotFound(testDependencyTrack *testutils.TestDependencyTrack) string {
+	return testDependencyTrack.AddProviderConfiguration(
+		`
+data "dependencytrack_team" "test" {
+	id          = "75e8a355-9581-427b-933b-5cfc1c017699"
+}
+`,
 	)
 }
 
