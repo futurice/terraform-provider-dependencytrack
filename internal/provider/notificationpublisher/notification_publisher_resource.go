@@ -6,6 +6,7 @@ package notificationpublisher
 import (
 	"context"
 	"fmt"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
@@ -113,7 +114,6 @@ func (r *NotificationPublisherResource) Create(ctx context.Context, req resource
 	var plan NotificationPublisherResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -137,7 +137,6 @@ func (r *NotificationPublisherResource) Read(ctx context.Context, req resource.R
 	var state NotificationPublisherResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -203,12 +202,17 @@ func (r *NotificationPublisherResource) Delete(ctx context.Context, req resource
 	var state NotificationPublisherResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.client.Notification.DeletePublisher(ctx, uuid.MustParse(state.ID.ValueString()))
+	publisherID, publisherIDDiags := utils.ParseAttributeUUID(state.ID.ValueString(), "id")
+	resp.Diagnostics.Append(publisherIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.client.Notification.DeletePublisher(ctx, publisherID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete notification publisher, got error: %s", err))
 		return
@@ -244,6 +248,7 @@ func DTPublisherToTFPublisher(ctx context.Context, dtPublisher dtrack.Notificati
 
 func TFPublisherToDTPublisher(ctx context.Context, tfPublisher NotificationPublisherResourceModel) (dtrack.NotificationPublisher, diag.Diagnostics) {
 	var diags diag.Diagnostics
+
 	publisher := dtrack.NotificationPublisher{
 		Name:             tfPublisher.Name.ValueString(),
 		Description:      tfPublisher.Description.ValueString(),
@@ -256,7 +261,10 @@ func TFPublisherToDTPublisher(ctx context.Context, tfPublisher NotificationPubli
 	if tfPublisher.ID.IsUnknown() {
 		publisher.UUID = uuid.Nil
 	} else {
-		publisher.UUID = uuid.MustParse(tfPublisher.ID.ValueString())
+		publisherID, publisherIDDiags := utils.ParseAttributeUUID(tfPublisher.ID.ValueString(), "id")
+		diags.Append(publisherIDDiags...)
+
+		publisher.UUID = publisherID
 	}
 
 	return publisher, diags
