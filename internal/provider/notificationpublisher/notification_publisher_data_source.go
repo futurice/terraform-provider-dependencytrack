@@ -101,7 +101,6 @@ func (d *NotificationPublisherDataSource) Read(ctx context.Context, req datasour
 	var state NotificationPublisherDataSourceModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
