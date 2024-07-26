@@ -3,6 +3,7 @@ package team_test
 import (
 	"fmt"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/teamtestutils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"strings"
@@ -11,7 +12,11 @@ import (
 
 func TestAccTeamDataSource_basic(t *testing.T) {
 	teamName := acctest.RandomWithPrefix("test-team")
-	teamDataSourceName := createTeamDataSourceName("test")
+
+	teamResourceName := teamtestutils.CreateTeamResourceName("test")
+	teamDataSourceName := teamtestutils.CreateTeamDataSourceName("test")
+
+	var teamID string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
@@ -20,6 +25,8 @@ func TestAccTeamDataSource_basic(t *testing.T) {
 			{
 				Config: testAccTeamDataSourceConfigBasic(testDependencyTrack, teamName),
 				Check: resource.ComposeAggregateTestCheckFunc(
+					testutils.TestAccCheckGetResourceID(teamResourceName, &teamID),
+					resource.TestCheckResourceAttrPtr(teamDataSourceName, "id", &teamID),
 					resource.TestCheckResourceAttr(teamDataSourceName, "name", teamName),
 				),
 			},
@@ -30,7 +37,7 @@ func TestAccTeamDataSource_basic(t *testing.T) {
 func TestAccTeamDataSource_permissions(t *testing.T) {
 	teamName := acctest.RandomWithPrefix("test-team")
 	permissionNames := []string{"ACCESS_MANAGEMENT", "BOM_UPLOAD"}
-	teamDataSourceName := createTeamDataSourceName("test")
+	teamDataSourceName := teamtestutils.CreateTeamDataSourceName("test")
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
@@ -107,8 +114,4 @@ data "dependencytrack_team" "test" {
 			),
 		),
 	)
-}
-
-func createTeamDataSourceName(localName string) string {
-	return fmt.Sprintf("data.dependencytrack_team.%s", localName)
 }

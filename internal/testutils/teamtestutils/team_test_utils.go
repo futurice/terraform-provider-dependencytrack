@@ -199,6 +199,10 @@ func CreateTeamResourceName(localName string) string {
 	return fmt.Sprintf("dependencytrack_team.%s", localName)
 }
 
+func CreateTeamDataSourceName(localName string) string {
+	return fmt.Sprintf("data.dependencytrack_team.%s", localName)
+}
+
 func CreateTeamPermissionResourceName(localName string) string {
 	return fmt.Sprintf("dependencytrack_team_permission.%s", localName)
 }
