@@ -4,6 +4,7 @@ import (
 	"fmt"
 	dtrack "github.com/futurice/dependency-track-client-go"
 	notificationpublishertestutils "github.com/futurice/terraform-provider-dependencytrack/internal/testutils/notificationpublisher"
+	"regexp"
 	"strconv"
 	"testing"
 
@@ -48,6 +49,19 @@ func TestAccNotificationPublisherDataSource_basic(t *testing.T) {
 	})
 }
 
+func TestAccNotificationPublisherDataSource_notFound(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccNotificationPublisherDataSourceConfigNotFound(testDependencyTrack),
+				ExpectError: regexp.MustCompile("The notification publisher could not be found"),
+			},
+		},
+	})
+}
+
 func testAccNotificationPublisherDataSourceConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, publisherName, publisherClass, templateMimeType, template, description string) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		testutils.ComposeConfigs(
@@ -68,5 +82,15 @@ data "dependencytrack_notification_publisher" "test" {
 }
 `,
 		),
+	)
+}
+
+func testAccNotificationPublisherDataSourceConfigNotFound(testDependencyTrack *testutils.TestDependencyTrack) string {
+	return testDependencyTrack.AddProviderConfiguration(
+		`
+data "dependencytrack_notification_publisher" "test" {
+	name = "75e8a355-9581-427b-933b-5cfc1c017699"
+}
+`,
 	)
 }

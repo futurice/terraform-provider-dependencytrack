@@ -111,6 +111,7 @@ func (d *NotificationPublisherDataSource) Read(ctx context.Context, req datasour
 		return
 	}
 
+	var found bool
 	for _, publisher := range publishers {
 		if publisher.Name == state.Name.ValueString() {
 			state.ID = types.StringValue(publisher.UUID.String())
@@ -120,7 +121,14 @@ func (d *NotificationPublisherDataSource) Read(ctx context.Context, req datasour
 			state.Template = types.StringValue(publisher.Template)
 			state.TemplateMimeType = types.StringValue(publisher.TemplateMimeType)
 			state.DefaultPublisher = types.BoolValue(publisher.DefaultPublisher)
+
+			found = true
 		}
+	}
+
+	if !found {
+		resp.Diagnostics.AddError("Client Error", "The notification publisher could not be found")
+		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
