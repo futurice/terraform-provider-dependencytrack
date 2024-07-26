@@ -221,11 +221,17 @@ func DTPublisherToTFPublisher(ctx context.Context, dtPublisher dtrack.Notificati
 	publisher := NotificationPublisherResourceModel{
 		ID:               types.StringValue(dtPublisher.UUID.String()),
 		Name:             types.StringValue(dtPublisher.Name),
-		Description:      types.StringValue(dtPublisher.Description),
 		PublisherClass:   types.StringValue(dtPublisher.PublisherClass),
 		DefaultPublisher: types.BoolValue(dtPublisher.DefaultPublisher),
 		TemplateMimeType: types.StringValue(dtPublisher.TemplateMimeType),
 		Template:         types.StringValue(dtPublisher.Template),
+	}
+
+	// normalize the description to null to allow the attribute to be optional
+	if len(dtPublisher.Description) > 0 {
+		publisher.Description = types.StringValue(dtPublisher.Description)
+	} else {
+		publisher.Description = types.StringNull()
 	}
 
 	return publisher, diags
