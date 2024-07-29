@@ -19,3 +19,7 @@ Notification rule project
 
 - `project_id` (String) ID of the project
 - `rule_id` (String) ID of the notification rule
+
+### Read-Only
+
+- `id` (String) Synthetic notification rule project ID in the form of project_id/rule_id

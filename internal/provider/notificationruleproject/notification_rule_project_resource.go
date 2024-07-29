@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/google/uuid"
-
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,6 +34,7 @@ type NotificationRuleProjectResource struct {
 
 // NotificationRuleProjectResourceModel describes the resource data model.
 type NotificationRuleProjectResourceModel struct {
+	ID        types.String `tfsdk:"id"`
 	ProjectID types.String `tfsdk:"project_id"`
 	RuleID    types.String `tfsdk:"rule_id"`
 }
@@ -61,6 +62,10 @@ func (r *NotificationRuleProjectResource) Schema(ctx context.Context, req resour
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Synthetic notification rule project ID in the form of project_id/rule_id",
+				Computed:            true,
+			},
 		},
 	}
 }
@@ -85,28 +90,40 @@ func (r *NotificationRuleProjectResource) Configure(ctx context.Context, req res
 }
 
 func (r *NotificationRuleProjectResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan NotificationRuleProjectResourceModel
+	var plan, state NotificationRuleProjectResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ruleID, ruleIDDiags := utils.ParseAttributeUUID(plan.RuleID.ValueString(), "rule_id")
+	resp.Diagnostics.Append(ruleIDDiags...)
+
+	projectID, projectIDDiags := utils.ParseAttributeUUID(plan.ProjectID.ValueString(), "project_id")
+	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err := r.client.Notification.AddProjectToRule(ctx, uuid.MustParse(plan.RuleID.String()), uuid.MustParse(plan.ProjectID.String()))
+	_, err := r.client.Notification.AddProjectToRule(ctx, ruleID, projectID)
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create API key, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create notification rule project, got error: %s", err))
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	state.ID = types.StringValue(makeNotificationRuleProjectID(ruleID, projectID))
+	state.RuleID = types.StringValue(ruleID.String())
+	state.ProjectID = types.StringValue(projectID.String())
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *NotificationRuleProjectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state NotificationRuleProjectResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -148,12 +165,21 @@ func (r *NotificationRuleProjectResource) Delete(ctx context.Context, req resour
 	var state NotificationRuleProjectResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ruleID, ruleIDDiags := utils.ParseAttributeUUID(state.RuleID.ValueString(), "rule_id")
+	resp.Diagnostics.Append(ruleIDDiags...)
+
+	projectID, projectIDDiags := utils.ParseAttributeUUID(state.ProjectID.ValueString(), "project_id")
+	resp.Diagnostics.Append(projectIDDiags...)
 
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err := r.client.Notification.DeleteProjectFromRule(ctx, uuid.MustParse(state.RuleID.ValueString()), uuid.MustParse(state.ProjectID.ValueString()))
+	_, err := r.client.Notification.DeleteProjectFromRule(ctx, ruleID, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete notification rule project relation, got error: %s", err))
 		return
@@ -169,6 +195,11 @@ func (r *NotificationRuleProjectResource) ImportState(ctx context.Context, req r
 		return
 	}
 
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("rule_id"), parts[1])...)
+}
+
+func makeNotificationRuleProjectID(ruleID uuid.UUID, projectID uuid.UUID) string {
+	return fmt.Sprintf("%s/%s", projectID.String(), ruleID.String())
 }
