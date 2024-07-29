@@ -55,12 +55,11 @@ func TestAccNotificationRuleProjectResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrPtr(notificationRuleProjectResourceName, "project_id", &projectID),
 				),
 			},
-			// TODO
-			//{
-			//	ResourceName:      notificationRuleProjectResourceName,
-			//	ImportState:       true,
-			//	ImportStateVerify: true,
-			//},
+			{
+				ResourceName:      notificationRuleProjectResourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
 			{
 				Config: testAccNotificationRuleProjectConfigOtherRuleAndProject(testDependencyTrack, publisherName, ruleName, projectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
