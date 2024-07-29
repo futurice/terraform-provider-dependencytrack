@@ -69,6 +69,10 @@ github.com/frankban/quicktest v1.14.3 h1:FJKSZTDHjyhriyC81FLQ0LY93eSai0ZyR/ZIkd3
 github.com/frankban/quicktest v1.14.3/go.mod h1:mgiwOwqx65TmIk1wJ6Q7wvnVMocbUorkibMOrVTHZps=
 github.com/futurice/dependency-track-client-go v0.0.0-20240408102005-c3ad5fb57202 h1:RIhdzp/3/9vIx+lMOwJzmo8kLJoGp70JPSu6jlehqgU=
 github.com/futurice/dependency-track-client-go v0.0.0-20240408102005-c3ad5fb57202/go.mod h1:nSSUhNjXItvlllTmfE3BdooP1GtAuu6dDXFAHSem0Jk=
+github.com/futurice/dependency-track-client-go v0.0.0-20240730072954-1cd773465f63 h1:ic7N/FIPMYsLvBp/Q8k0JXY41QJd//sSrOLAOtJ7Pak=
+github.com/futurice/dependency-track-client-go v0.0.0-20240730072954-1cd773465f63/go.mod h1:nSSUhNjXItvlllTmfE3BdooP1GtAuu6dDXFAHSem0Jk=
+github.com/futurice/dependency-track-client-go v0.0.0-20240730102435-ec2e22cc097c h1:rUmqDSw/clCENP/eMA8EMhlqoPL0n9ILOLiKwWttmW8=
+github.com/futurice/dependency-track-client-go v0.0.0-20240730102435-ec2e22cc097c/go.mod h1:nSSUhNjXItvlllTmfE3BdooP1GtAuu6dDXFAHSem0Jk=
 github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 h1:+zs/tPmkDkHx3U66DAb0lQFJrpS6731Oaa12ikc+DiI=
 github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376/go.mod h1:an3vInlBmSxCcxctByoQdvwPiA7DTK7jaaFDBTtu0ic=
 github.com/go-git/go-billy/v5 v5.5.0 h1:yEY4yhzCDuMGSv83oGxiBotRzhwhNr8VZyphhiu+mTU=
