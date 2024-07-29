@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/google/uuid"
-
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -237,12 +237,17 @@ func (r *NotificationRuleResource) Delete(ctx context.Context, req resource.Dele
 	var state NotificationRuleResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.client.Notification.DeleteRule(ctx, uuid.MustParse(state.ID.ValueString()))
+	ruleID, ruleIDDiags := utils.ParseAttributeUUID(state.ID.ValueString(), "id")
+	resp.Diagnostics.Append(ruleIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.client.Notification.DeleteRule(ctx, ruleID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete notification rule, got error: %s", err))
 		return
@@ -282,9 +287,14 @@ func DTRuleToTFRule(ctx context.Context, dtRule dtrack.NotificationRule) (Notifi
 }
 
 func TFRuleToDTRule(ctx context.Context, tfRule NotificationRuleResourceModel) (dtrack.NotificationRule, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	publisherID, publisherIDDiags := utils.ParseAttributeUUID(tfRule.PublisherID.ValueString(), "publisher_id")
+	diags.Append(publisherIDDiags...)
+
 	rule := dtrack.NotificationRule{
 		Name:                 tfRule.Name.ValueString(),
-		Publisher:            dtrack.NotificationPublisher{UUID: uuid.MustParse(tfRule.PublisherID.ValueString())},
+		Publisher:            dtrack.NotificationPublisher{UUID: publisherID},
 		Scope:                tfRule.Scope.ValueString(),
 		NotificationLevel:    tfRule.NotificationLevel.ValueString(),
 		Enabled:              tfRule.Enabled.ValueBool(),
@@ -294,16 +304,22 @@ func TFRuleToDTRule(ctx context.Context, tfRule NotificationRuleResourceModel) (
 	}
 
 	elements := make([]types.String, 0, len(tfRule.NotifyOn.Elements()))
-	diags := tfRule.NotifyOn.ElementsAs(ctx, &elements, false)
-	rule.NotifyOn = make([]string, len(elements))
-	for i := range elements {
-		rule.NotifyOn[i] = elements[i].ValueString()
+	notifyOnDiags := tfRule.NotifyOn.ElementsAs(ctx, &elements, false)
+	diags.Append(notifyOnDiags...)
+	if !notifyOnDiags.HasError() {
+		rule.NotifyOn = make([]string, len(elements))
+		for i := range elements {
+			rule.NotifyOn[i] = elements[i].ValueString()
+		}
 	}
 
 	if tfRule.ID.IsUnknown() {
 		rule.UUID = uuid.Nil
 	} else {
-		rule.UUID = uuid.MustParse(tfRule.ID.ValueString())
+		ruleID, ruleIDDiags := utils.ParseAttributeUUID(tfRule.ID.ValueString(), "id")
+		diags.Append(ruleIDDiags...)
+
+		rule.UUID = ruleID
 	}
 
 	return rule, diags
