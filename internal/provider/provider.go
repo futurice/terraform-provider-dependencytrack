@@ -7,6 +7,7 @@ import (
 	"context"
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/aclmapping"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/configproperty"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationpublisher"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationrule"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationruleproject"
@@ -103,6 +104,7 @@ func (p *DependencyTrackProvider) Configure(ctx context.Context, req provider.Co
 
 func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		configproperty.NewConfigPropertyResource,
 		team.NewTeamResource,
 		teamapikey.NewTeamAPIKeyResource,
 		teampermission.NewTeamPermissionResource,
