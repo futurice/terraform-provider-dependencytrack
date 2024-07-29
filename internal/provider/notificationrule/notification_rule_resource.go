@@ -72,6 +72,9 @@ func (r *NotificationRuleResource) Schema(ctx context.Context, req resource.Sche
 			"scope": schema.StringAttribute{
 				MarkdownDescription: "Rule scope. Possible values: [PORTFOLIO, SYSTEM]",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"notification_level": schema.StringAttribute{
 				MarkdownDescription: "Notification level. Possible values: [INFORMATIONAL, WARNING, ERROR]",
@@ -264,6 +267,13 @@ func DTRuleToTFRule(ctx context.Context, dtRule dtrack.NotificationRule) (Notifi
 		LogSuccessfulPublish: types.BoolValue(dtRule.LogSuccessfulPublish),
 		NotifyChildren:       types.BoolValue(dtRule.NotifyChildren),
 		PublisherConfig:      types.StringValue(dtRule.PublisherConfig),
+	}
+
+	// normalize to null to allow the attribute to be optional
+	if len(dtRule.PublisherConfig) > 0 {
+		rule.PublisherConfig = types.StringValue(dtRule.PublisherConfig)
+	} else {
+		rule.PublisherConfig = types.StringNull()
 	}
 
 	rule.NotifyOn, diags = types.SetValueFrom(ctx, types.StringType, dtRule.NotifyOn)
