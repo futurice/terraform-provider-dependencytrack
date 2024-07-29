@@ -236,7 +236,7 @@ func DTPublisherToTFPublisher(ctx context.Context, dtPublisher dtrack.Notificati
 		Template:         types.StringValue(dtPublisher.Template),
 	}
 
-	// normalize the description to null to allow the attribute to be optional
+	// normalize to null to allow the attribute to be optional
 	if len(dtPublisher.Description) > 0 {
 		publisher.Description = types.StringValue(dtPublisher.Description)
 	} else {
