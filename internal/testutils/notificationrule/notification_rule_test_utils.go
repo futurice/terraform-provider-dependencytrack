@@ -3,6 +3,8 @@ package notificationruletestutils
 import (
 	"context"
 	"fmt"
+	"slices"
+
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/google/go-cmp/cmp"
@@ -77,6 +79,39 @@ func FindNotificationRule(ctx context.Context, testDependencyTrack *testutils.Te
 	return nil, nil
 }
 
+func TestAccCheckNotificationRuleHasExpectedProjects(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedProjectIDs []*string) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		rule, err := FindNotificationRuleByResourceName(ctx, testDependencyTrack, state, resourceName)
+		if err != nil {
+			return err
+		}
+		if rule == nil {
+			return fmt.Errorf("notification rule for resource %s does not exist in Dependency-Track", resourceName)
+		}
+
+		if len(rule.Projects) != len(expectedProjectIDs) {
+			return fmt.Errorf("notification rule for resource %s has %d projects instead of the expected %d", resourceName, len(rule.Projects), len(expectedProjectIDs))
+		}
+
+		actualProjectIDs := make([]string, len(rule.Projects))
+		for i, project := range rule.Projects {
+			actualProjectIDs[i] = project.UUID.String()
+		}
+
+		for _, expectedProjectID := range expectedProjectIDs {
+			if !slices.Contains(actualProjectIDs, *expectedProjectID) {
+				return fmt.Errorf("notification rule for resource %s is missing expected project %s, got [%v]", resourceName, *expectedProjectID, actualProjectIDs)
+			}
+		}
+
+		return nil
+	}
+}
+
 func CreateNotificationRuleResourceName(localName string) string {
 	return fmt.Sprintf("dependencytrack_notification_rule.%s", localName)
+}
+
+func CreateNotificationRuleProjectResourceName(localName string) string {
+	return fmt.Sprintf("dependencytrack_notification_rule_project.%s", localName)
 }

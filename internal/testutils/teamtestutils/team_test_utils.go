@@ -107,7 +107,7 @@ func TestAccCheckTeamHasExpectedACLMappings(ctx context.Context, testDependencyT
 
 		for _, expectedACLMappingProjectID := range expectedACLMappingProjectIDs {
 			if !slices.Contains(actualACLMappingProjectIDs, *expectedACLMappingProjectID) {
-				return fmt.Errorf("team for resource %s is missing expected permission %s, got [%v]", resourceName, *expectedACLMappingProjectID, actualACLMappingProjectIDs)
+				return fmt.Errorf("team for resource %s is missing expected ACL mapping project %s, got [%v]", resourceName, *expectedACLMappingProjectID, actualACLMappingProjectIDs)
 			}
 		}
 
