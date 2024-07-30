@@ -4,7 +4,6 @@ import (
 	"fmt"
 	dtrack "github.com/futurice/dependency-track-client-go"
 	notificationpublishertestutils "github.com/futurice/terraform-provider-dependencytrack/internal/testutils/notificationpublisher"
-	"strconv"
 	"testing"
 
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
@@ -46,7 +45,6 @@ func TestAccNotificationPublisherResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(publisherResourceName, "publisher_class", testPublisher.PublisherClass),
 					resource.TestCheckResourceAttr(publisherResourceName, "template_mime_type", testPublisher.TemplateMimeType),
 					resource.TestCheckResourceAttr(publisherResourceName, "template", testPublisher.Template),
-					resource.TestCheckResourceAttr(publisherResourceName, "default_publisher", strconv.FormatBool(testPublisher.DefaultPublisher)),
 				),
 			},
 			{
@@ -62,56 +60,10 @@ func TestAccNotificationPublisherResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(publisherResourceName, "publisher_class", testUpdatedPublisher.PublisherClass),
 					resource.TestCheckResourceAttr(publisherResourceName, "template_mime_type", testUpdatedPublisher.TemplateMimeType),
 					resource.TestCheckResourceAttr(publisherResourceName, "template", testUpdatedPublisher.Template),
-					resource.TestCheckResourceAttr(publisherResourceName, "default_publisher", strconv.FormatBool(testUpdatedPublisher.DefaultPublisher)),
 				),
 			},
 		},
 		CheckDestroy: notificationpublishertestutils.TestAccCheckNotificationPublisherDoesNotExists(ctx, testDependencyTrack, publisherResourceName),
-	})
-}
-
-func TestAccNotificationPublisherResource_default(t *testing.T) {
-	// TODO we should probably just remove this attribute
-	t.Skip("Creating a new default publisher results in an error 'The creation of a new default publisher is forbidden'")
-	ctx := testutils.CreateTestContext(t)
-
-	publisherResourceName := notificationpublishertestutils.CreateNotificationPublisherResourceName("test")
-
-	testPublisher := dtrack.NotificationPublisher{
-		Name:             acctest.RandomWithPrefix("test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.SlackPublisher",
-		TemplateMimeType: "application/json",
-		Template:         `{}`,
-		DefaultPublisher: true,
-	}
-
-	testUpdatedPublisher := dtrack.NotificationPublisher{
-		Name:             acctest.RandomWithPrefix("test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.SlackPublisher",
-		TemplateMimeType: "application/json",
-		Template:         `{}`,
-		DefaultPublisher: false,
-	}
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
-		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccNotificationPublisherConfigDefault(testDependencyTrack, testPublisher.Name, testPublisher.DefaultPublisher),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					notificationpublishertestutils.TestAccCheckNotificationPublisherExistsAndHasExpectedData(ctx, testDependencyTrack, publisherResourceName, testPublisher),
-					resource.TestCheckResourceAttr(publisherResourceName, "default_publisher", strconv.FormatBool(testPublisher.DefaultPublisher)),
-				),
-			},
-			{
-				Config: testAccNotificationPublisherConfigDefault(testDependencyTrack, testUpdatedPublisher.Name, testUpdatedPublisher.DefaultPublisher),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					notificationpublishertestutils.TestAccCheckNotificationPublisherExistsAndHasExpectedData(ctx, testDependencyTrack, publisherResourceName, testUpdatedPublisher),
-					resource.TestCheckResourceAttr(publisherResourceName, "default_publisher", strconv.FormatBool(testUpdatedPublisher.DefaultPublisher)),
-				),
-			},
-		},
 	})
 }
 
@@ -169,22 +121,6 @@ resource "dependencytrack_notification_publisher" "test" {
 }
 `,
 			publisherName, publisherClass, templateMimeType, template,
-		),
-	)
-}
-
-func testAccNotificationPublisherConfigDefault(testDependencyTrack *testutils.TestDependencyTrack, publisherName string, defaultPublisher bool) string {
-	return testDependencyTrack.AddProviderConfiguration(
-		fmt.Sprintf(`
-resource "dependencytrack_notification_publisher" "test" {
-	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
-	template_mime_type = "application/json"
-	template           = "{}"
-	default_publisher  = %[2]t
-}
-`,
-			publisherName, defaultPublisher,
 		),
 	)
 }
