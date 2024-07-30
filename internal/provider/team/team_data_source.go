@@ -29,10 +29,14 @@ type TeamDataSource struct {
 
 // TeamDataSourceModel describes the data source data model.
 type TeamDataSourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	Permissions      types.Set    `tfsdk:"permissions"`
-	MappedOIDCGroups types.Set    `tfsdk:"mapped_oidc_groups"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Permissions types.Set    `tfsdk:"permissions"`
+	// Commented out for now pending developments in https://github.com/DependencyTrack/dependency-track/issues/4000
+	//   if the issue is fixed: this can be uncommented (here and below) and a test can be added for this attribute
+	//   if the issue is not fixed: one workaround would be to migrate this data source to use the endpoint that returns
+	//     all the teams
+	//MappedOIDCGroups types.Set    `tfsdk:"mapped_oidc_groups"`
 }
 
 func (d *TeamDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -57,11 +61,12 @@ func (d *TeamDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 				MarkdownDescription: "Permissions given to the team",
 				Computed:            true,
 			},
-			"mapped_oidc_groups": schema.SetAttribute{
-				ElementType:         types.StringType,
-				MarkdownDescription: "OIDC groups mapped to the team",
-				Computed:            true,
-			},
+			// See TeamDataSourceModel.MappedOIDCGroups above
+			//"mapped_oidc_groups": schema.SetAttribute{
+			//	ElementType:         types.StringType,
+			//	MarkdownDescription: "OIDC groups mapped to the team",
+			//	Computed:            true,
+			//},
 		},
 	}
 }
@@ -117,11 +122,12 @@ func (d *TeamDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	model.Permissions, _ = types.SetValueFrom(ctx, types.StringType, tfPermissions)
 
-	tfOIDCGroups := make([]string, len(team.MappedOIDCGroups))
-	for i, p := range team.MappedOIDCGroups {
-		tfOIDCGroups[i] = p.UUID.String()
-	}
-	model.MappedOIDCGroups, _ = types.SetValueFrom(ctx, types.StringType, tfOIDCGroups)
+	// See TeamDataSourceModel.MappedOIDCGroups above
+	//tfOIDCGroups := make([]string, len(team.MappedOIDCGroups))
+	//for i, p := range team.MappedOIDCGroups {
+	//	tfOIDCGroups[i] = p.UUID.String()
+	//}
+	//model.MappedOIDCGroups, _ = types.SetValueFrom(ctx, types.StringType, tfOIDCGroups)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
