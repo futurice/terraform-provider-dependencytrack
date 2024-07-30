@@ -69,12 +69,6 @@ func TestAccTeamDataSource_permissions(t *testing.T) {
 	})
 }
 
-func TestAccTeamDataSource_mappedOIDCGroups(t *testing.T) {
-	// TODO either add the required resources or add test mappings with direct API calls to complete this test
-	//   additionally this simply does not work now, see https://github.com/DependencyTrack/dependency-track/issues/4000
-	t.Skip("Currently reading mapped OIDC groups does not work")
-}
-
 func testAccTeamDataSourceConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, teamName string) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		fmt.Sprintf(`

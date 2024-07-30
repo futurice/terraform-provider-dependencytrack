@@ -21,6 +21,5 @@ TODO data source
 
 ### Read-Only
 
-- `mapped_oidc_groups` (Set of String) OIDC groups mapped to the team
 - `name` (String) Name of the team
 - `permissions` (Set of String) Permissions given to the team
