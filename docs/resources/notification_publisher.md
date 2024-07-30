@@ -24,7 +24,6 @@ Notification publisher
 
 ### Optional
 
-- `default_publisher` (Boolean) Whether this is a default publisher
 - `description` (String) Description of the publisher
 
 ### Read-Only

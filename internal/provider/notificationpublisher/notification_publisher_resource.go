@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -40,7 +39,6 @@ type NotificationPublisherResourceModel struct {
 	Name             types.String `tfsdk:"name"`
 	Description      types.String `tfsdk:"description"`
 	PublisherClass   types.String `tfsdk:"publisher_class"`
-	DefaultPublisher types.Bool   `tfsdk:"default_publisher"`
 	TemplateMimeType types.String `tfsdk:"template_mime_type"`
 	Template         types.String `tfsdk:"template"`
 }
@@ -80,12 +78,6 @@ func (r *NotificationPublisherResource) Schema(ctx context.Context, req resource
 			"description": schema.StringAttribute{
 				MarkdownDescription: "Description of the publisher",
 				Optional:            true,
-			},
-			"default_publisher": schema.BoolAttribute{
-				MarkdownDescription: "Whether this is a default publisher",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
 			},
 		},
 	}
@@ -231,7 +223,6 @@ func DTPublisherToTFPublisher(ctx context.Context, dtPublisher dtrack.Notificati
 		ID:               types.StringValue(dtPublisher.UUID.String()),
 		Name:             types.StringValue(dtPublisher.Name),
 		PublisherClass:   types.StringValue(dtPublisher.PublisherClass),
-		DefaultPublisher: types.BoolValue(dtPublisher.DefaultPublisher),
 		TemplateMimeType: types.StringValue(dtPublisher.TemplateMimeType),
 		Template:         types.StringValue(dtPublisher.Template),
 	}
@@ -253,7 +244,6 @@ func TFPublisherToDTPublisher(ctx context.Context, tfPublisher NotificationPubli
 		Name:             tfPublisher.Name.ValueString(),
 		Description:      tfPublisher.Description.ValueString(),
 		PublisherClass:   tfPublisher.PublisherClass.ValueString(),
-		DefaultPublisher: tfPublisher.DefaultPublisher.ValueBool(),
 		TemplateMimeType: tfPublisher.TemplateMimeType.ValueString(),
 		Template:         tfPublisher.Template.ValueString(),
 	}
