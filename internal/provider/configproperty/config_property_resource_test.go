@@ -225,11 +225,11 @@ func testAccCheckConfigPropertyHasExpectedValue(ctx context.Context, testDepende
 		if configProperty == nil {
 			return fmt.Errorf("failed to find config property [%s]/[%s] from Dependency-Track", groupName, name)
 		}
-		if configProperty.PropertyValue == nil {
+		if configProperty.Value == "" {
 			return fmt.Errorf("config property [%s]/[%s] has no value", groupName, name)
 		}
 
-		configPropertyValue := *configProperty.PropertyValue
+		configPropertyValue := configProperty.Value
 		if configPropertyValue != expectedValue {
 			return fmt.Errorf("config property [%s]/[%s] has value [%s] instead of the expected [%s]", groupName, name, configPropertyValue, expectedValue)
 		}
@@ -239,13 +239,13 @@ func testAccCheckConfigPropertyHasExpectedValue(ctx context.Context, testDepende
 }
 
 func findConfigProperty(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, groupName, name string) (*dtrack.ConfigProperty, error) {
-	configProperties, err := testDependencyTrack.Client.Config.GetAllConfigProperties(ctx)
+	configProperties, err := testDependencyTrack.Client.Config.GetAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config properties from Dependency-Track: %w", err)
 	}
 
 	for _, configProperty := range configProperties {
-		if configProperty.GroupName == groupName && configProperty.PropertyName == name {
+		if configProperty.GroupName == groupName && configProperty.Name == name {
 			return &configProperty, nil
 		}
 	}
@@ -254,13 +254,13 @@ func findConfigProperty(ctx context.Context, testDependencyTrack *testutils.Test
 }
 
 func setConfigProperty(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, groupName, name, value string) error {
-	setConfigPropertyRequest := dtrack.SetConfigPropertyRequest{
-		GroupName:     groupName,
-		PropertyName:  name,
-		PropertyValue: value,
+	setConfigPropertyRequest := dtrack.ConfigProperty{
+		GroupName: groupName,
+		Name:      name,
+		Value:     value,
 	}
 
-	_, err := testDependencyTrack.Client.Config.SetConfigProperty(ctx, setConfigPropertyRequest)
+	_, err := testDependencyTrack.Client.Config.Update(ctx, setConfigPropertyRequest)
 	if err != nil {
 		return fmt.Errorf("failed to set config property in Dependency-Track: %w", err)
 	}

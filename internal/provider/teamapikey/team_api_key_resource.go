@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -33,8 +33,11 @@ type TeamAPIKeyResource struct {
 
 // TeamAPIKeyResourceModel describes the resource data model.
 type TeamAPIKeyResourceModel struct {
-	TeamID types.String `tfsdk:"team_id"`
-	Value  types.String `tfsdk:"value"`
+	ID      types.String `tfsdk:"id"`
+	TeamID  types.String `tfsdk:"team_id"`
+	Value   types.String `tfsdk:"value"`
+	Comment types.String `tfsdk:"comment"`
+	Legacy  types.Bool   `tfsdk:"legacy"`
 }
 
 func (r *TeamAPIKeyResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -46,6 +49,13 @@ func (r *TeamAPIKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 		MarkdownDescription: "API Key for a team",
 
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Generated ID of the API key, the public ID returned by the API",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"team_id": schema.StringAttribute{
 				MarkdownDescription: "ID of the team",
 				Required:            true,
@@ -57,6 +67,14 @@ func (r *TeamAPIKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "Value of the API key",
 				Computed:            true,
 				Sensitive:           true,
+			},
+			"legacy": schema.BoolAttribute{
+				MarkdownDescription: "Whether the key is legacy or not",
+				Computed:            true,
+			},
+			"comment": schema.StringAttribute{
+				MarkdownDescription: "The API key comment",
+				Optional:            true,
 			},
 		},
 	}
@@ -101,7 +119,17 @@ func (r *TeamAPIKeyResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	plan.Value = types.StringValue(apiKey)
+	if plan.Comment.ValueString() != "" {
+		_, err := r.client.Team.UpdateAPIKeyComment(ctx, apiKey.PublicId, plan.Comment.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update API key comment, got error: %s", err))
+			return
+		}
+	}
+
+	plan.ID = types.StringValue(apiKey.PublicId)
+	plan.Value = types.StringValue(apiKey.Key)
+	plan.Legacy = types.BoolValue(apiKey.Legacy)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -114,28 +142,13 @@ func (r *TeamAPIKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	// NOTE: API only returns the API keys for the team when fetching all the teams
-	teams, err := r.client.Team.GetAll(ctx, dtrack.PageOptions{})
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read team, got error: %s", err))
+	var apiKey, diags = r.getTeamAPIKey(ctx, state.TeamID.ValueString(), state.ID.ValueString(), state.Value.ValueString())
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	found := false
-	for _, team := range teams.Items {
-		if team.UUID.String() != state.TeamID.ValueString() {
-			continue
-		}
-
-		for _, key := range team.APIKeys {
-			if key.Key == state.Value.ValueString() {
-				found = true
-				break
-			}
-		}
-	}
-
-	if !found {
+	if apiKey == (dtrack.APIKey{}) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -143,8 +156,54 @@ func (r *TeamAPIKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
+func (r *TeamAPIKeyResource) getTeamAPIKey(ctx context.Context, teamID string, id string, value string) (dtrack.APIKey, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	// NOTE: API only returns the API keys for the team when fetching all the teams
+	teams, err := r.client.Team.GetAll(ctx, dtrack.PageOptions{})
+	if err != nil {
+		diags.AddError("Client Error", fmt.Sprintf("Unable to read team, got error: %s", err))
+		return dtrack.APIKey{}, diags
+	}
+
+	for _, team := range teams.Items {
+		if team.UUID.String() != teamID {
+			continue
+		}
+
+		for _, key := range team.APIKeys {
+			if key.Legacy {
+				if key.Key == value {
+					return key, diags
+				}
+			} else {
+				if key.PublicId == id {
+					return key, diags
+				}
+			}
+		}
+	}
+
+	return dtrack.APIKey{}, diags
+}
+
 func (r *TeamAPIKeyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("Internal Error", "API Key resource is immutable")
+	var plan, state TeamAPIKeyResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	_, err := r.client.Team.UpdateAPIKeyComment(ctx, state.ID.String(), plan.Comment.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update API key comment, got error: %s", err))
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *TeamAPIKeyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -155,7 +214,11 @@ func (r *TeamAPIKeyResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	_, err := r.client.Team.DeleteAPIKey(ctx, state.Value.ValueString())
+	idOrKey := state.ID.ValueString()
+	if state.Legacy.ValueBool() {
+		idOrKey = state.Value.ValueString()
+	}
+	err := r.client.Team.DeleteAPIKey(ctx, idOrKey)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete API key, got error: %s", err))
 		return
@@ -167,10 +230,41 @@ func (r *TeamAPIKeyResource) Delete(ctx context.Context, req resource.DeleteRequ
 func (r *TeamAPIKeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, "/")
 	if len(parts) != 2 {
-		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("Expected ID in the format 'team_id/api_key', got [%s]", req.ID))
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("Expected ID in the format 'team_id/publicID', got [%s]", req.ID))
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("team_id"), parts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), parts[1])...)
+	teamID := parts[0]
+	publicID := parts[1]
+
+	apiKey, diags := r.getTeamAPIKey(ctx, teamID, publicID, "")
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if apiKey == (dtrack.APIKey{}) {
+		resp.Diagnostics.AddError("API Key Not Found", fmt.Sprintf("No API key found for team ID [%s] and public ID [%s]", teamID, publicID))
+		return
+	}
+
+	tfApiKey, diags := DTAPIKeyToTFAPIKey(ctx, apiKey, parts[0])
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &tfApiKey)...)
+}
+
+func DTAPIKeyToTFAPIKey(ctx context.Context, dtAPIKey dtrack.APIKey, teamID string) (TeamAPIKeyResourceModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	APIKey := TeamAPIKeyResourceModel{
+		ID:      types.StringValue(dtAPIKey.PublicId),
+		TeamID:  types.StringValue(teamID),
+		Comment: types.StringValue(dtAPIKey.Comment),
+		Legacy:  types.BoolValue(dtAPIKey.Legacy),
+	}
+
+	return APIKey, diags
 }

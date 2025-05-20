@@ -32,7 +32,7 @@ func TestAccCheckProjectExistsAndHasExpectedLazyData(ctx context.Context, testDe
 			return fmt.Errorf("project for resource %s does not exist in Dependency-Track", resourceName)
 		}
 
-		diff := cmp.Diff(project, &expectedProject, cmpopts.IgnoreFields(dtrack.Project{}, "UUID", "Properties", "Tags", "Metrics"))
+		diff := cmp.Diff(project, &expectedProject, cmpopts.IgnoreFields(dtrack.Project{}, "UUID", "Properties", "Tags", "Metrics", "IsLatest"))
 		if diff != "" {
 			return fmt.Errorf("project for resource %s is different than expected: %s", resourceName, diff)
 		}

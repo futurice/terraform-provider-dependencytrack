@@ -121,13 +121,13 @@ func (r *ConfigPropertyResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	setConfigPropertyRequest := dtrack.SetConfigPropertyRequest{
-		GroupName:     groupName,
-		PropertyName:  name,
-		PropertyValue: value,
+	setConfigPropertyRequest := dtrack.ConfigProperty{
+		GroupName: groupName,
+		Name:      name,
+		Value:     value,
 	}
 
-	_, err := r.client.Config.SetConfigProperty(ctx, setConfigPropertyRequest)
+	_, err := r.client.Config.Update(ctx, setConfigPropertyRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set config property, got error: %s", err))
 		return
@@ -139,8 +139,8 @@ func (r *ConfigPropertyResource) Create(ctx context.Context, req resource.Create
 	state.Value = types.StringValue(value)
 	state.DestroyValue = plan.DestroyValue
 
-	if originalProperty != nil && originalProperty.PropertyValue != nil {
-		state.OriginalValue = types.StringValue(*originalProperty.PropertyValue)
+	if originalProperty != nil && originalProperty.Value != "" {
+		state.OriginalValue = types.StringValue(originalProperty.Value)
 	} else {
 		state.OriginalValue = types.StringNull()
 	}
@@ -170,8 +170,8 @@ func (r *ConfigPropertyResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	if property.PropertyValue != nil {
-		state.Value = types.StringValue(*property.PropertyValue)
+	if property.Value != "" {
+		state.Value = types.StringValue(property.Value)
 	} else {
 		state.Value = types.StringNull()
 	}
@@ -193,13 +193,13 @@ func (r *ConfigPropertyResource) Update(ctx context.Context, req resource.Update
 	name := state.Name.ValueString()
 	value := plan.Value.ValueString()
 
-	setConfigPropertyRequest := dtrack.SetConfigPropertyRequest{
-		GroupName:     groupName,
-		PropertyName:  name,
-		PropertyValue: value,
+	setConfigPropertyRequest := dtrack.ConfigProperty{
+		GroupName: groupName,
+		Name:      name,
+		Value:     value,
 	}
 
-	_, err := r.client.Config.SetConfigProperty(ctx, setConfigPropertyRequest)
+	_, err := r.client.Config.Update(ctx, setConfigPropertyRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set config property, got error: %s", err))
 		return
@@ -234,13 +234,13 @@ func (r *ConfigPropertyResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	if restoreValue != nil {
-		setConfigPropertyRequest := dtrack.SetConfigPropertyRequest{
-			GroupName:     groupName,
-			PropertyName:  name,
-			PropertyValue: *restoreValue,
+		setConfigPropertyRequest := dtrack.ConfigProperty{
+			GroupName: groupName,
+			Name:      name,
+			Value:     *restoreValue,
 		}
 
-		_, err := r.client.Config.SetConfigProperty(ctx, setConfigPropertyRequest)
+		_, err := r.client.Config.Update(ctx, setConfigPropertyRequest)
 		if err != nil {
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to reset config property to original value, got error: %s", err))
 			return
@@ -257,14 +257,14 @@ func (r *ConfigPropertyResource) ImportState(ctx context.Context, req resource.I
 func (r *ConfigPropertyResource) findConfigProperty(ctx context.Context, groupName, name string) (*dtrack.ConfigProperty, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	configProperties, err := r.client.Config.GetAllConfigProperties(ctx)
+	configProperties, err := r.client.Config.GetAll(ctx)
 	if err != nil {
 		diags.AddError("Client Error", fmt.Sprintf("Unable to get config properties, got error: %s", err))
 		return nil, diags
 	}
 
 	for _, configProperty := range configProperties {
-		if configProperty.GroupName == groupName && configProperty.PropertyName == name {
+		if configProperty.GroupName == groupName && configProperty.Name == name {
 			return &configProperty, diags
 		}
 	}

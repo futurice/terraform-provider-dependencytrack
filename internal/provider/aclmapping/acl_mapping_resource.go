@@ -99,12 +99,12 @@ func (r *ACLMappingResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	mapping := dtrack.ACLMapping{
+	mapping := dtrack.ACLMappingRequest{
 		Team:    teamID,
 		Project: projectID,
 	}
 
-	err := r.client.ACLMapping.Create(ctx, mapping)
+	err := r.client.ACL.AddProjectMapping(ctx, mapping)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create ACL mapping, got error: %s", err))
 		return
@@ -135,7 +135,7 @@ func (r *ACLMappingResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	projectMappings, err := r.client.ACLMapping.Get(ctx, teamID)
+	projects, err := r.client.ACL.GetAllProjects(ctx, teamID, dtrack.PageOptions{})
 	if err != nil {
 		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
 			resp.State.RemoveResource(ctx)
@@ -147,7 +147,7 @@ func (r *ACLMappingResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	found := false
-	for _, project := range projectMappings {
+	for _, project := range projects.Items {
 		if project.UUID == projectID {
 			found = true
 			break
@@ -187,23 +187,18 @@ func (r *ACLMappingResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	newMapping := dtrack.ACLMapping{
+	newMapping := dtrack.ACLMappingRequest{
 		Team:    newTeamID,
 		Project: newProjectID,
 	}
 
-	oldMapping := dtrack.ACLMapping{
-		Team:    oldTeamID,
-		Project: oldProjectID,
-	}
-
-	err := r.client.ACLMapping.Create(ctx, newMapping)
+	err := r.client.ACL.AddProjectMapping(ctx, newMapping)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create new ACL mapping, got error: %s", err))
 		return
 	}
 
-	err = r.client.ACLMapping.Delete(ctx, oldMapping)
+	err = r.client.ACL.RemoveProjectMapping(ctx, oldTeamID, oldProjectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete old ACL mapping, got error: %s", err))
 		return
@@ -234,12 +229,7 @@ func (r *ACLMappingResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	mapping := dtrack.ACLMapping{
-		Team:    teamID,
-		Project: projectID,
-	}
-
-	err := r.client.ACLMapping.Delete(ctx, mapping)
+	err := r.client.ACL.RemoveProjectMapping(ctx, teamID, projectID)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete ACL mapping, got error: %s", err))
 		return

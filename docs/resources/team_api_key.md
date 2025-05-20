@@ -19,6 +19,12 @@ API Key for a team
 
 - `team_id` (String) ID of the team
 
+### Optional
+
+- `comment` (String) The API key comment
+
 ### Read-Only
 
+- `id` (String) Generated ID of the API key, the public ID returned by the API
+- `legacy` (Boolean) Whether the key is legacy or not
 - `value` (String, Sensitive) Value of the API key

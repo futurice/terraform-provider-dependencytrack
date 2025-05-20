@@ -197,7 +197,7 @@ func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConf
 
 func startDependencyTrackContainer(ctx context.Context) (testcontainers.Container, error) {
 	containerRequest := testcontainers.ContainerRequest{
-		Image:        "dependencytrack/apiserver:4.11.5",
+		Image:        "dependencytrack/apiserver:4.13.2",
 		ExposedPorts: []string{"8080/tcp"},
 		WaitingFor:   wait.ForLog("Dependency-Track is ready").WithStartupTimeout(2 * time.Minute),
 	}
@@ -333,7 +333,8 @@ func createAllPowerfulApiKey(ctx context.Context, client *dtrack.Client) (apiKey
 
 	fmt.Printf("Granted all %d permissions to team %s\n", len(allPermissions.Items), teamName)
 
-	apiKey, err = client.Team.GenerateAPIKey(ctx, team.UUID)
+	apiKeyObject, err := client.Team.GenerateAPIKey(ctx, team.UUID)
+	apiKey = apiKeyObject.Key
 	if err != nil {
 		return "", fmt.Errorf("could not create Dependency-Track API key for test team: %w", err)
 	}

@@ -5,12 +5,14 @@ package teamapikey_test
 
 import (
 	"fmt"
+	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/teamtestutils"
-	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"os"
+	"strconv"
 	"testing"
 )
 
@@ -35,7 +37,8 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 	otherTeamResourceName := teamtestutils.CreateTeamResourceName("test-other")
 	apiKeyResourceName := teamtestutils.CreateTeamAPIKeyResourceName("test")
 
-	var teamID, otherTeamID, teamAPIKey, otherTeamAPIKey string
+	var teamAPIKey, otherTeamAPIKey dtrack.APIKey
+	var teamID, otherTeamID string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
@@ -46,18 +49,20 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					teamtestutils.TestAccCheckGetTeamSingleAPIKey(ctx, testDependencyTrack, teamResourceName, &teamAPIKey),
 					testutils.TestAccCheckGetResourceID(teamResourceName, &teamID),
+					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "id", &teamAPIKey.PublicId),
 					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "team_id", &teamID),
-					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "value", &teamAPIKey),
+					resource.TestCheckResourceAttr(apiKeyResourceName, "legacy", strconv.FormatBool(teamAPIKey.Legacy)),
+					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "comment", &teamAPIKey.Comment),
 				),
 			},
 			{
 				ResourceName: apiKeyResourceName,
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					return fmt.Sprintf("%s/%s", teamID, teamAPIKey), nil
+					return fmt.Sprintf("%s/%s", teamID, teamAPIKey.PublicId), nil
 				},
-				ImportState: true,
-				// Unable to verify since the resource has no ID and no non-sensitive ID can be synthesised; we are just smoke-testing the import
-				ImportStateVerify: false,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"value"},
 			},
 			{
 				Config: testAccTeamAPIKeyConfigOtherTeam(testDependencyTrack, teamName),
@@ -65,8 +70,9 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 					teamtestutils.TestAccCheckTeamHasNoAPIKeys(ctx, testDependencyTrack, teamResourceName),
 					teamtestutils.TestAccCheckGetTeamSingleAPIKey(ctx, testDependencyTrack, otherTeamResourceName, &otherTeamAPIKey),
 					testutils.TestAccCheckGetResourceID(otherTeamResourceName, &otherTeamID),
+					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "id", &otherTeamAPIKey.PublicId),
 					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "team_id", &otherTeamID),
-					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "value", &otherTeamAPIKey),
+					resource.TestCheckResourceAttr(apiKeyResourceName, "legacy", strconv.FormatBool(otherTeamAPIKey.Legacy)),
 				),
 			},
 			{
@@ -94,6 +100,7 @@ resource "dependencytrack_team" "test" {
 			`
 resource "dependencytrack_team_api_key" "test" {
 	team_id = dependencytrack_team.test.id
+    comment	 	= "This is a test API key"
 }
 `,
 		),

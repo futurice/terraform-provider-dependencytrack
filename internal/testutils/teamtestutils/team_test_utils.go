@@ -94,17 +94,17 @@ func TestAccCheckTeamHasExpectedACLMappings(ctx context.Context, testDependencyT
 			return fmt.Errorf("team for resource %s does not exist in Dependency-Track", resourceName)
 		}
 
-		aclMappings, err := testDependencyTrack.Client.ACLMapping.Get(ctx, team.UUID)
+		aclMappings, err := testDependencyTrack.Client.ACL.GetAllProjects(ctx, team.UUID, dtrack.PageOptions{})
 		if err != nil {
 			return err
 		}
 
-		if len(aclMappings) != len(expectedACLMappingProjectIDs) {
-			return fmt.Errorf("team for resource %s has %d permissions instead of the expected %d", resourceName, len(aclMappings), len(expectedACLMappingProjectIDs))
+		if aclMappings.TotalCount != len(expectedACLMappingProjectIDs) {
+			return fmt.Errorf("team for resource %s has %d permissions instead of the expected %d", resourceName, aclMappings.TotalCount, len(expectedACLMappingProjectIDs))
 		}
 
-		actualACLMappingProjectIDs := make([]string, len(aclMappings))
-		for i, aclMapping := range aclMappings {
+		actualACLMappingProjectIDs := make([]string, aclMappings.TotalCount)
+		for i, aclMapping := range aclMappings.Items {
 			actualACLMappingProjectIDs[i] = aclMapping.UUID.String()
 		}
 
@@ -136,7 +136,7 @@ func TestAccCheckTeamHasNoAPIKeys(ctx context.Context, testDependencyTrack *test
 	}
 }
 
-func TestAccCheckGetTeamSingleAPIKey(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, apiKeyTarget *string) resource.TestCheckFunc {
+func TestAccCheckGetTeamSingleAPIKey(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, apiKeyTarget *dtrack.APIKey) resource.TestCheckFunc {
 	return func(state *terraform.State) error {
 		team, err := FindTeamByResourceName(ctx, testDependencyTrack, state, resourceName)
 		if err != nil {
@@ -150,7 +150,7 @@ func TestAccCheckGetTeamSingleAPIKey(ctx context.Context, testDependencyTrack *t
 			return fmt.Errorf("team for resource %s has %d API keys instead of the expected 1", resourceName, len(team.APIKeys))
 		}
 
-		*apiKeyTarget = team.APIKeys[0].Key
+		*apiKeyTarget = team.APIKeys[0]
 
 		return nil
 	}
