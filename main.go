@@ -38,6 +38,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
+		//nolint:godox // This is a template TODO that may be kept for future reference
 		// TODO: Update this string with the published name of your provider.
 		// Also update the tfplugindocs generate command to either remove the
 		// -provider-name flag or set its value to the updated provider name.

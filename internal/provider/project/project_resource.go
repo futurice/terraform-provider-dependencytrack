@@ -5,7 +5,9 @@ package project
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 
@@ -171,7 +173,8 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	respProject, err := r.client.Project.Get(ctx, projectID)
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}

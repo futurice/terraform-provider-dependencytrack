@@ -17,7 +17,7 @@ import (
 )
 
 const ExternalDependencyTrackEndpointEnvVarName = "TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT"
-const ExternalDependencyTrackApikeyEnvVarName = "TF_ACC_EXTERNAL_DEPENDENCY_TRACK_APIKEY"
+const ExternalDependencyTrackApikeyEnvVarName = "TF_ACC_EXTERNAL_DEPENDENCY_TRACK_APIKEY" //nolint:gosec // This is just an environment variable name, not actual credentials
 const ShowDependencyTrackContainerLogsEnvVarName = "TF_ACC_SHOW_DEPENDENCY_TRACK_CONTAINER_LOGS"
 
 const defaultDependencyTrackUser = "admin"
@@ -27,7 +27,7 @@ const defaultDependencyTrackPassword = "admin"
 // be run, and an API client to access it.
 type TestDependencyTrack struct {
 	Endpoint string
-	ApiKey   string
+	APIKey   string
 	Client   *dtrack.Client
 
 	config    *testDependencyTrackConfig
@@ -101,7 +101,7 @@ provider "dependencytrack" {
 }
 
 %s
-`, tdt.Endpoint, tdt.ApiKey, terraformCode)
+`, tdt.Endpoint, tdt.APIKey, terraformCode)
 }
 
 // Close disposes of the test Dependency-Track API server. If an internal Docker container was started, it will be discarded.
@@ -162,7 +162,7 @@ func newTestDependencyTrackFromExternalEndpoint(config *testDependencyTrackConfi
 
 	return &TestDependencyTrack{
 		Endpoint: config.endpoint,
-		ApiKey:   config.apiKey,
+		APIKey:   config.apiKey,
 		Client:   client,
 
 		config:    config,
@@ -184,7 +184,7 @@ func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConf
 	if err != nil {
 		stopErr := stopDependencyTrackContainer(ctx, config, container)
 		if stopErr != nil {
-			err = fmt.Errorf("%w (also failed to stop the container with error %v)", err, stopErr)
+			err = fmt.Errorf("%w (also failed to stop the container with error %w)", err, stopErr)
 		}
 
 		return nil, fmt.Errorf("could not configure Dependency-Track container: %w", err)
@@ -264,14 +264,14 @@ func configureDependencyTrackContainer(ctx context.Context, config *testDependen
 		return nil, fmt.Errorf("could not create Dependency-Track admin client: %w", err)
 	}
 
-	apiKey, err := createAllPowerfulApiKey(ctx, adminClient)
+	apiKey, err := createAllPowerfulAPIKey(ctx, adminClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not create Dependency-Track API key: %w", err)
 	}
 
 	return &TestDependencyTrack{
 		Endpoint: containerEndpoint,
-		ApiKey:   apiKey.Key,
+		APIKey:   apiKey.Key,
 		Client:   adminClient,
 
 		config:    config,
@@ -306,7 +306,7 @@ func loginAsDefaultUser(ctx context.Context, endpoint string) (token string, err
 	return
 }
 
-func createAllPowerfulApiKey(ctx context.Context, client *dtrack.Client) (apiKey dtrack.APIKey, err error) {
+func createAllPowerfulAPIKey(ctx context.Context, client *dtrack.Client) (apiKey dtrack.APIKey, err error) {
 	teamName := "test"
 
 	team, err := client.Team.Create(ctx, dtrack.Team{
@@ -340,5 +340,5 @@ func createAllPowerfulApiKey(ctx context.Context, client *dtrack.Client) (apiKey
 
 	fmt.Printf("Created an API key for team %s\n", teamName)
 
-	return
+	return apiKey, err
 }

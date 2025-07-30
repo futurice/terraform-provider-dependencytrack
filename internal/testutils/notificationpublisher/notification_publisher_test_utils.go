@@ -6,6 +6,7 @@ package notificationpublishertestutils
 import (
 	"context"
 	"fmt"
+
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/google/go-cmp/cmp"
@@ -84,9 +85,9 @@ func FindNotificationPublisher(ctx context.Context, testDependencyTrack *testuti
 }
 
 func CreateNotificationPublisherResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_notification_publisher.%s", localName)
+	return "dependencytrack_notification_publisher." + localName
 }
 
 func CreateNotificationPublisherDataSourceName(localName string) string {
-	return fmt.Sprintf("data.dependencytrack_notification_publisher.%s", localName)
+	return "data.dependencytrack_notification_publisher." + localName
 }

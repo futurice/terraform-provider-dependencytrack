@@ -5,9 +5,12 @@ package teampermission
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/google/uuid"
+	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
@@ -101,11 +104,12 @@ func (r *TeamPermissionResource) Create(ctx context.Context, req resource.Create
 
 	_, err := r.client.Permission.AddPermissionToTeam(ctx, permission, teamID)
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) {
 			switch apiErr.StatusCode {
-			case 304:
+			case http.StatusNotModified:
 				resp.Diagnostics.AddError("Client Error", "The permission already existed on the team")
-			case 404:
+			case http.StatusNotFound:
 				resp.Diagnostics.AddError("Client Error", fmt.Sprintf("The permission '%s' not found", permission.Name))
 			}
 		} else {
@@ -137,7 +141,8 @@ func (r *TeamPermissionResource) Read(ctx context.Context, req resource.ReadRequ
 
 	respTeam, err := r.client.Team.Get(ctx, teamID)
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}

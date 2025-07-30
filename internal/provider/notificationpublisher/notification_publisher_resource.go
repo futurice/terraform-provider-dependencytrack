@@ -5,7 +5,10 @@ package notificationpublisher
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
@@ -135,7 +138,8 @@ func (r *NotificationPublisherResource) Read(ctx context.Context, req resource.R
 
 	publishers, err := r.client.Notification.GetAllPublishers(ctx)
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}

@@ -6,10 +6,11 @@ package configproperty_test
 import (
 	"context"
 	"fmt"
-	dtrack "github.com/futurice/dependency-track-client-go"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"os"
 	"testing"
+
+	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -213,7 +214,7 @@ resource "dependencytrack_config_property" "test" {
 }
 
 func createConfigPropertyResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_config_property.%s", localName)
+	return "dependencytrack_config_property." + localName
 }
 
 func testAccCheckConfigPropertyHasExpectedValue(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, groupName, name, expectedValue string) resource.TestCheckFunc {

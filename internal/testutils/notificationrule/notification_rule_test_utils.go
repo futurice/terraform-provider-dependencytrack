@@ -112,9 +112,9 @@ func TestAccCheckNotificationRuleHasExpectedProjects(ctx context.Context, testDe
 }
 
 func CreateNotificationRuleResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_notification_rule.%s", localName)
+	return "dependencytrack_notification_rule." + localName
 }
 
 func CreateNotificationRuleProjectResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_notification_rule_project.%s", localName)
+	return "dependencytrack_notification_rule_project." + localName
 }

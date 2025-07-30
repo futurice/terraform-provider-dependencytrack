@@ -5,15 +5,16 @@ package project_test
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"testing"
+
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/projecttestutils"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"os"
-	"strconv"
-	"testing"
 )
 
 var testDependencyTrack *testutils.TestDependencyTrack
@@ -289,7 +290,7 @@ resource "dependencytrack_project" "test" {
 }
 
 func testAccProjectConfigParent(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
-	parentProjectName := fmt.Sprintf("parent-%s", projectName)
+	parentProjectName := "parent-" + projectName
 
 	return testDependencyTrack.AddProviderConfiguration(
 		testutils.ComposeConfigs(
@@ -315,8 +316,8 @@ resource "dependencytrack_project" "test" {
 }
 
 func testAccProjectConfigOtherParent(testDependencyTrack *testutils.TestDependencyTrack, projectName string) string {
-	parentProjectName := fmt.Sprintf("parent-%s", projectName)
-	otherParentProjectName := fmt.Sprintf("other-parent-%s", projectName)
+	parentProjectName := "parent-" + projectName
+	otherParentProjectName := "other-parent-" + projectName
 
 	return testDependencyTrack.AddProviderConfiguration(
 		testutils.ComposeConfigs(

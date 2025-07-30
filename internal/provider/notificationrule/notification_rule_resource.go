@@ -5,7 +5,9 @@ package notificationrule
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
@@ -180,7 +182,8 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 
 	rules, err := r.client.Notification.GetAllRules(ctx)
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}

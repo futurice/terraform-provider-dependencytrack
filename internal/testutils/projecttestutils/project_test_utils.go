@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/google/go-cmp/cmp"
@@ -74,7 +76,7 @@ func FindProject(ctx context.Context, testDependencyTrack *testutils.TestDepende
 	if err != nil {
 		var apiErr *dtrack.APIError
 		ok := errors.As(err, &apiErr)
-		if !ok || apiErr.StatusCode != 404 {
+		if !ok || apiErr.StatusCode != http.StatusNotFound {
 			return nil, fmt.Errorf("failed to get project from Dependency-Track: %w", err)
 		}
 
@@ -85,5 +87,5 @@ func FindProject(ctx context.Context, testDependencyTrack *testutils.TestDepende
 }
 
 func CreateProjectResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_project.%s", localName)
+	return "dependencytrack_project." + localName
 }

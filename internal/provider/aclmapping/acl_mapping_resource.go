@@ -5,7 +5,9 @@ package aclmapping
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
@@ -137,7 +139,8 @@ func (r *ACLMappingResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	projectMappings, err := r.client.ACLMapping.Get(ctx, teamID)
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}

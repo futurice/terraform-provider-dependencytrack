@@ -5,13 +5,14 @@ package team_test
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
+	"testing"
+
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/teamtestutils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"regexp"
-	"strings"
-	"testing"
 )
 
 func TestAccTeamDataSource_basic(t *testing.T) {
@@ -103,7 +104,7 @@ func testAccTeamDataSourceConfigPermissions(testDependencyTrack *testutils.TestD
 	permissionResources := make([]string, len(permissionNames))
 
 	for i, permissionName := range permissionNames {
-		permissionResourceNames[i] = fmt.Sprintf("dependencytrack_team_permission.test-%[1]s", permissionName)
+		permissionResourceNames[i] = "dependencytrack_team_permission.test-" + permissionName
 
 		permissionResources[i] = fmt.Sprintf(`
 resource "dependencytrack_team_permission" "test-%[1]s" {

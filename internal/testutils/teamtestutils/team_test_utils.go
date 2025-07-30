@@ -200,21 +200,21 @@ func FindTeam(ctx context.Context, testDependencyTrack *testutils.TestDependency
 }
 
 func CreateTeamResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_team.%s", localName)
+	return "dependencytrack_team." + localName
 }
 
 func CreateTeamDataSourceName(localName string) string {
-	return fmt.Sprintf("data.dependencytrack_team.%s", localName)
+	return "data.dependencytrack_team." + localName
 }
 
 func CreateTeamPermissionResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_team_permission.%s", localName)
+	return "dependencytrack_team_permission." + localName
 }
 
 func CreateTeamAPIKeyResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_team_api_key.%s", localName)
+	return "dependencytrack_team_api_key." + localName
 }
 
 func CreateACLMappingResourceName(localName string) string {
-	return fmt.Sprintf("dependencytrack_acl_mapping.%s", localName)
+	return "dependencytrack_acl_mapping." + localName
 }

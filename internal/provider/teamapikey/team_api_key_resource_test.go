@@ -4,6 +4,7 @@
 package teamapikey_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -51,7 +52,7 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "public_id", &teamAPIKeyPublicID),
 					resource.TestCheckResourceAttrWith(apiKeyResourceName, "value", func(value string) error {
 						if value == "" || value == "null" {
-							return fmt.Errorf("expected non-empty value for API key")
+							return errors.New("expected non-empty value for API key")
 						}
 						return nil
 					}),
@@ -76,7 +77,7 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "public_id", &otherTeamAPIKeyPublicID),
 					resource.TestCheckResourceAttrWith(apiKeyResourceName, "value", func(value string) error {
 						if value == "" || value == "null" {
-							return fmt.Errorf("expected non-empty value for API key")
+							return errors.New("expected non-empty value for API key")
 						}
 						return nil
 					}),

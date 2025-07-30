@@ -5,14 +5,15 @@ package notificationrule_test
 
 import (
 	"fmt"
-	dtrack "github.com/futurice/dependency-track-client-go"
-	notificationpublishertestutils "github.com/futurice/terraform-provider-dependencytrack/internal/testutils/notificationpublisher"
-	notificationruletestutils "github.com/futurice/terraform-provider-dependencytrack/internal/testutils/notificationrule"
-	"github.com/google/uuid"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	dtrack "github.com/futurice/dependency-track-client-go"
+	notificationpublishertestutils "github.com/futurice/terraform-provider-dependencytrack/internal/testutils/notificationpublisher"
+	notificationruletestutils "github.com/futurice/terraform-provider-dependencytrack/internal/testutils/notificationrule"
+	"github.com/google/uuid"
 
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -30,7 +31,7 @@ func init() {
 	}
 
 	testOtherPublisher = testPublisher
-	testOtherPublisher.Name = fmt.Sprintf("%s-other", testPublisher.Name)
+	testOtherPublisher.Name = testPublisher.Name + "-other"
 }
 
 var testDependencyTrack *testutils.TestDependencyTrack

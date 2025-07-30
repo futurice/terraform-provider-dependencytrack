@@ -5,7 +5,10 @@ package team
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -123,7 +126,8 @@ func (r *TeamResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	respTeam, err := r.client.Team.Get(ctx, teamID)
 	if err != nil {
-		if apiErr, ok := err.(*dtrack.APIError); ok && apiErr.StatusCode == 404 {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
 			resp.State.RemoveResource(ctx)
 			return
 		}
