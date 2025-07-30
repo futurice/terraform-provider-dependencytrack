@@ -1,27 +1,145 @@
+version: "2"
+
 # Visit https://golangci-lint.run/ for usage documentation
 # and information on other useful linters
+linters:
+  default: none
+  enable:
+    # Error handling and checking
+    - errcheck          # Check for unchecked errors
+    - errorlint         # Error wrapping issues (Go 1.13+)
+    - nilerr           # Returns nil even if error is not nil
+    - nilnesserr       # Checks for err != nil but returns different nil error
+    
+    # Code quality and best practices
+    - staticcheck      # Comprehensive static analysis (includes gosimple, unused)
+    - govet           # Go's built-in vet tool
+    - ineffassign     # Detect ineffective assignments
+    - unconvert       # Remove unnecessary type conversions
+    - unparam         # Report unused function parameters
+    - unused          # Check for unused constants, variables, functions and types
+    - wastedassign    # Find wasted assignment statements
+    
+    # Security
+    - gosec           # Security issues
+    - canonicalheader # Check for canonical HTTP headers
+    
+    # Performance
+    - perfsprint      # Performance improvements for fmt.Sprintf
+    - makezero        # Check slice declarations with non-zero initial length
+    - prealloc        # Pre-allocate slices when possible
+    
+    # Style and formatting
+    - revive          # Fast, configurable replacement for golint
+    - godot           # Comments should end with periods
+    - misspell        # Commonly misspelled English words
+    - whitespace      # Unnecessary newlines
+    
+    # Complexity and maintainability
+    - gocyclo         # Cyclomatic complexity
+    - gocognit        # Cognitive complexity
+    - nestif          # Deeply nested if statements
+    - funlen          # Function length
+    
+    # Modern Go features and best practices
+    - copyloopvar     # Loop variable copying (Go 1.22+)
+    - intrange        # Integer range loops (Go 1.22+)
+    - usestdlibvars   # Use standard library variables/constants
+    - exptostd        # Replace golang.org/x/exp with std functions
+    
+    # Code organization
+    - grouper         # Expression groups
+    - importas        # Consistent import aliases
+    - decorder        # Declaration order
+    
+    # Testing
+    - testifylint     # testify usage
+    - thelper         # Test helpers should call t.Helper()
+    - testableexamples # Examples should be testable
+    
+    # Documentation
+    - godox           # TODO, FIXME comments
+    
+    # Specific patterns
+    - durationcheck   # Duration multiplication
+    - forcetypeassert # Forced type assertions
+    - predeclared     # Shadowing predeclared identifiers
+    - bodyclose       # HTTP response body closing
+    - rowserrcheck    # SQL rows.Err checking
+    
+    # Code clarity
+    - nolintlint      # Malformed nolint directives
+    - mirror          # Wrong mirror patterns
+    - nakedret        # Naked returns in long functions
+
+  exclusions:
+    generated: strict
+    presets:
+      - comments
+      - common-false-positives
+      - std-error-handling
+    paths:
+      - "vendor/"
+      - "third_party/"
+      - ".pb.go$"
+    rules:
+      - linters:
+          - gosec
+        text: "G404:"  # Allow weak random number generator in tests
+        path: "_test.go$"
+
+  settings:
+    errcheck:
+      # Don't report errors for these function calls
+      exclude-functions:
+        - encoding/json.Marshal
+        - encoding/json.MarshalIndent
+        - (io.Closer).Close
+
+    govet:
+      enable:
+        - shadow
+        - unusedresult
+      
+    staticcheck:
+      # Enable all checks
+      checks: ["all"]
+      
+    revive:
+      severity: error
+      confidence: 0.8
+      
+    gosec:
+      # Exclude some noisy rules
+      excludes:
+        - G404  # Use of weak random number generator (math/rand)
+      
+    gocyclo:
+      min-complexity: 15
+      
+    gocognit:
+      min-complexity: 15
+      
+    funlen:
+      lines: 100
+      statements: 50
+      
+    nestif:
+      min-complexity: 5
+      
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
 issues:
-  max-per-linter: 0
   max-same-issues: 0
 
-linters:
-  disable-all: true
+formatters:
   enable:
-    - durationcheck
-    - errcheck
-    - exportloopref
-    - forcetypeassert
-    - godot
     - gofmt
-    - gosimple
-    - ineffassign
-    - makezero
-    - misspell
-    - nilerr
-    - predeclared
-    - staticcheck
-    - tenv
-    - unconvert
-    - unparam
-    - unused
-    - vet
+  exclusions:
+    generated: strict
+    paths:
+      - "vendor/"
+      - "third_party/"
+      - ".pb.go$"
