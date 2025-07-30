@@ -197,7 +197,7 @@ func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConf
 
 func startDependencyTrackContainer(ctx context.Context) (testcontainers.Container, error) {
 	containerRequest := testcontainers.ContainerRequest{
-		Image:        "dependencytrack/apiserver:4.11.5",
+		Image:        "dependencytrack/apiserver:4.13.2",
 		ExposedPorts: []string{"8080/tcp"},
 		WaitingFor:   wait.ForLog("Dependency-Track is ready").WithStartupTimeout(2 * time.Minute),
 	}
@@ -271,7 +271,7 @@ func configureDependencyTrackContainer(ctx context.Context, config *testDependen
 
 	return &TestDependencyTrack{
 		Endpoint: containerEndpoint,
-		ApiKey:   apiKey,
+		ApiKey:   apiKey.Key,
 		Client:   adminClient,
 
 		config:    config,
@@ -306,14 +306,14 @@ func loginAsDefaultUser(ctx context.Context, endpoint string) (token string, err
 	return
 }
 
-func createAllPowerfulApiKey(ctx context.Context, client *dtrack.Client) (apiKey string, err error) {
+func createAllPowerfulApiKey(ctx context.Context, client *dtrack.Client) (apiKey dtrack.APIKey, err error) {
 	teamName := "test"
 
 	team, err := client.Team.Create(ctx, dtrack.Team{
 		Name: teamName,
 	})
 	if err != nil {
-		return "", fmt.Errorf("could not create Dependency-Track test team: %w", err)
+		return dtrack.APIKey{}, fmt.Errorf("could not create Dependency-Track test team: %w", err)
 	}
 
 	fmt.Printf("Created team %s\n", teamName)
@@ -321,13 +321,13 @@ func createAllPowerfulApiKey(ctx context.Context, client *dtrack.Client) (apiKey
 	// all signs point to paging options being ignored by this endpoint
 	allPermissions, err := client.Permission.GetAll(ctx, dtrack.PageOptions{})
 	if err != nil {
-		return "", fmt.Errorf("could not get Dependency-Track permissions: %w", err)
+		return dtrack.APIKey{}, fmt.Errorf("could not get Dependency-Track permissions: %w", err)
 	}
 
 	for _, permission := range allPermissions.Items {
 		_, err = client.Permission.AddPermissionToTeam(ctx, permission, team.UUID)
 		if err != nil {
-			return "", fmt.Errorf("could not grant permission %s to Dependency-Track test team: %w", permission.Name, err)
+			return dtrack.APIKey{}, fmt.Errorf("could not grant permission %s to Dependency-Track test team: %w", permission.Name, err)
 		}
 	}
 
@@ -335,7 +335,7 @@ func createAllPowerfulApiKey(ctx context.Context, client *dtrack.Client) (apiKey
 
 	apiKey, err = client.Team.GenerateAPIKey(ctx, team.UUID)
 	if err != nil {
-		return "", fmt.Errorf("could not create Dependency-Track API key for test team: %w", err)
+		return dtrack.APIKey{}, fmt.Errorf("could not create Dependency-Track API key for test team: %w", err)
 	}
 
 	fmt.Printf("Created an API key for team %s\n", teamName)

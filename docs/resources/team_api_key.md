@@ -21,4 +21,5 @@ API Key for a team
 
 ### Read-Only
 
+- `public_id` (String) ID of the API key
 - `value` (String, Sensitive) Value of the API key

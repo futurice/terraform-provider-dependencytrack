@@ -6,8 +6,9 @@ package teamapikey
 import (
 	"context"
 	"fmt"
-	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"strings"
+
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -33,8 +34,9 @@ type TeamAPIKeyResource struct {
 
 // TeamAPIKeyResourceModel describes the resource data model.
 type TeamAPIKeyResourceModel struct {
-	TeamID types.String `tfsdk:"team_id"`
-	Value  types.String `tfsdk:"value"`
+	TeamID   types.String `tfsdk:"team_id"`
+	PublicID types.String `tfsdk:"public_id"`
+	Value    types.String `tfsdk:"value"`
 }
 
 func (r *TeamAPIKeyResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -53,10 +55,17 @@ func (r *TeamAPIKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"public_id": schema.StringAttribute{
+				MarkdownDescription: "ID of the API key",
+				Computed:            true,
+			},
 			"value": schema.StringAttribute{
 				MarkdownDescription: "Value of the API key",
 				Computed:            true,
 				Sensitive:           true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -101,7 +110,8 @@ func (r *TeamAPIKeyResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	plan.Value = types.StringValue(apiKey)
+	plan.PublicID = types.StringValue(apiKey.PublicID)
+	plan.Value = types.StringValue(apiKey.Key)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -128,7 +138,7 @@ func (r *TeamAPIKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 		}
 
 		for _, key := range team.APIKeys {
-			if key.Key == state.Value.ValueString() {
+			if key.PublicID == state.PublicID.ValueString() {
 				found = true
 				break
 			}
@@ -155,7 +165,7 @@ func (r *TeamAPIKeyResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	_, err := r.client.Team.DeleteAPIKey(ctx, state.Value.ValueString())
+	_, err := r.client.Team.DeleteAPIKey(ctx, state.PublicID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete API key, got error: %s", err))
 		return
@@ -166,11 +176,12 @@ func (r *TeamAPIKeyResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 func (r *TeamAPIKeyResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.Split(req.ID, "/")
-	if len(parts) != 2 {
-		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("Expected ID in the format 'team_id/api_key', got [%s]", req.ID))
+	if len(parts) != 3 {
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("Expected ID in the format 'team_id/key_public_id/key', got [%s]", req.ID))
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("team_id"), parts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), parts[1])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("public_id"), parts[1])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("value"), parts[2])...)
 }

@@ -6,6 +6,8 @@ package teamtestutils
 import (
 	"context"
 	"fmt"
+	"slices"
+
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/google/go-cmp/cmp"
@@ -13,7 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"slices"
 )
 
 func TestAccCheckTeamExistsAndHasExpectedData(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, expectedTeam dtrack.Team) resource.TestCheckFunc {
@@ -136,7 +137,7 @@ func TestAccCheckTeamHasNoAPIKeys(ctx context.Context, testDependencyTrack *test
 	}
 }
 
-func TestAccCheckGetTeamSingleAPIKey(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, apiKeyTarget *string) resource.TestCheckFunc {
+func TestAccCheckGetTeamSingleAPIKey(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, resourceName string, publicIDTarget *string) resource.TestCheckFunc {
 	return func(state *terraform.State) error {
 		team, err := FindTeamByResourceName(ctx, testDependencyTrack, state, resourceName)
 		if err != nil {
@@ -150,7 +151,7 @@ func TestAccCheckGetTeamSingleAPIKey(ctx context.Context, testDependencyTrack *t
 			return fmt.Errorf("team for resource %s has %d API keys instead of the expected 1", resourceName, len(team.APIKeys))
 		}
 
-		*apiKeyTarget = team.APIKeys[0].Key
+		*publicIDTarget = team.APIKeys[0].PublicID
 
 		return nil
 	}

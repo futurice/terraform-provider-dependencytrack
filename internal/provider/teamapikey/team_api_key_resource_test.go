@@ -5,13 +5,14 @@ package teamapikey_test
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils/teamtestutils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"os"
-	"testing"
 )
 
 var testDependencyTrack *testutils.TestDependencyTrack
@@ -35,7 +36,7 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 	otherTeamResourceName := teamtestutils.CreateTeamResourceName("test-other")
 	apiKeyResourceName := teamtestutils.CreateTeamAPIKeyResourceName("test")
 
-	var teamID, otherTeamID, teamAPIKey, otherTeamAPIKey string
+	var teamID, otherTeamID, teamAPIKeyPublicID, otherTeamAPIKeyPublicID string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
@@ -44,16 +45,22 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 			{
 				Config: testAccTeamAPIKeyConfigBasic(testDependencyTrack, teamName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					teamtestutils.TestAccCheckGetTeamSingleAPIKey(ctx, testDependencyTrack, teamResourceName, &teamAPIKey),
+					teamtestutils.TestAccCheckGetTeamSingleAPIKey(ctx, testDependencyTrack, teamResourceName, &teamAPIKeyPublicID),
 					testutils.TestAccCheckGetResourceID(teamResourceName, &teamID),
 					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "team_id", &teamID),
-					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "value", &teamAPIKey),
+					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "public_id", &teamAPIKeyPublicID),
+					resource.TestCheckResourceAttrWith(apiKeyResourceName, "value", func(value string) error {
+						if value == "" || value == "null" {
+							return fmt.Errorf("expected non-empty value for API key")
+						}
+						return nil
+					}),
 				),
 			},
 			{
 				ResourceName: apiKeyResourceName,
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
-					return fmt.Sprintf("%s/%s", teamID, teamAPIKey), nil
+					return fmt.Sprintf("%s/%s/%s", teamID, teamAPIKeyPublicID, ""), nil
 				},
 				ImportState: true,
 				// Unable to verify since the resource has no ID and no non-sensitive ID can be synthesised; we are just smoke-testing the import
@@ -63,10 +70,16 @@ func TestAccTeamAPIKeyResource_basic(t *testing.T) {
 				Config: testAccTeamAPIKeyConfigOtherTeam(testDependencyTrack, teamName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					teamtestutils.TestAccCheckTeamHasNoAPIKeys(ctx, testDependencyTrack, teamResourceName),
-					teamtestutils.TestAccCheckGetTeamSingleAPIKey(ctx, testDependencyTrack, otherTeamResourceName, &otherTeamAPIKey),
+					teamtestutils.TestAccCheckGetTeamSingleAPIKey(ctx, testDependencyTrack, otherTeamResourceName, &otherTeamAPIKeyPublicID),
 					testutils.TestAccCheckGetResourceID(otherTeamResourceName, &otherTeamID),
 					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "team_id", &otherTeamID),
-					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "value", &otherTeamAPIKey),
+					resource.TestCheckResourceAttrPtr(apiKeyResourceName, "public_id", &otherTeamAPIKeyPublicID),
+					resource.TestCheckResourceAttrWith(apiKeyResourceName, "value", func(value string) error {
+						if value == "" || value == "null" {
+							return fmt.Errorf("expected non-empty value for API key")
+						}
+						return nil
+					}),
 				),
 			},
 			{
