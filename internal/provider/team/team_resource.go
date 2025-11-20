@@ -225,12 +225,12 @@ func (r *TeamResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		}
 
 		for groupID, mappingID := range actualMappings {
-			mappingID_uuid, err := uuid.Parse(mappingID)
+			mappingIDUUID, err := uuid.Parse(mappingID)
 			if err != nil {
 				resp.Diagnostics.AddError("Internal Error", fmt.Sprintf("Invalid mapping UUID %s from state for group %s", mappingID, groupID))
 				continue
 			}
-			err = r.client.OIDC.RemoveTeamMapping(ctx, mappingID_uuid)
+			err = r.client.OIDC.RemoveTeamMapping(ctx, mappingIDUUID)
 			if err != nil {
 				// Don't stop; try to delete the team anyway
 				resp.Diagnostics.AddWarning("Client Error", fmt.Sprintf("Unable to remove OIDC mapping for group %s: %s. Continuing with team deletion.", groupID, err))
@@ -259,7 +259,7 @@ func (r *TeamResource) ImportState(ctx context.Context, req resource.ImportState
 
 func DTTeamToTFTeam(ctx context.Context, dtTeam dtrack.Team) (TeamResourceModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	var groupIds []string
+	groupIds := make([]string, 0, len(dtTeam.MappedOIDCGroups))
 	mappingMap := make(map[string]string)
 
 	for _, mapping := range dtTeam.MappedOIDCGroups {
@@ -304,48 +304,55 @@ func TFTeamToDTTeam(ctx context.Context, tfTeam TeamResourceModel) (dtrack.Team,
 	return team, diags
 }
 
-// syncOIDCMappings adds / removes mappings based on plan and state
-func (r *TeamResource) syncOIDCMappings(ctx context.Context, plan TeamResourceModel, state TeamResourceModel, teamUUID uuid.UUID) diag.Diagnostics {
+// Convert types.List in plan to a better searchable map.
+func (r *TeamResource) formatDesiredGroups(ctx context.Context, plan TeamResourceModel) (map[string]bool, diag.Diagnostics) {
 	var diags diag.Diagnostics
-
-	// Convert types.List in plan to a map
 	var desiredGroupIDs []types.String
 	if !plan.OIDCGroupIds.IsNull() {
 		diags.Append(plan.OIDCGroupIds.ElementsAs(ctx, &desiredGroupIDs, false)...)
 		if diags.HasError() {
-			return diags
+			return nil, diags
 		}
 	}
-	desiredSet := make(map[string]bool)
+	desiredSet := make(map[string]bool, len(desiredGroupIDs))
 	for _, id := range desiredGroupIDs {
 		if id.IsUnknown() || id.IsNull() {
 			continue
 		}
 		desiredSet[id.ValueString()] = true
 	}
+	return desiredSet, diags
+}
 
-	// Convert types.Map in state to map
+// Convert types.Map in state to map.
+func (r *TeamResource) formatExistingMappings(ctx context.Context, state TeamResourceModel) (map[string]string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
 	var frameworkMappings map[string]types.String
 	if !state.OIDCGroupMappings.IsNull() {
 		diags.Append(state.OIDCGroupMappings.ElementsAs(ctx, &frameworkMappings, false)...)
 		if diags.HasError() {
-			return diags
+			return nil, diags
 		}
 	}
-	actualMappings := make(map[string]string)
-	for groupId, mappingId := range frameworkMappings {
-		if mappingId.IsUnknown() || mappingId.IsNull() {
+	actualMappings := make(map[string]string, len(frameworkMappings))
+	for groupID, mappingID := range frameworkMappings {
+		if mappingID.IsUnknown() || mappingID.IsNull() {
 			continue
 		}
-		actualMappings[groupId] = mappingId.ValueString()
+		actualMappings[groupID] = mappingID.ValueString()
 	}
+	return actualMappings, diags
+}
 
-	// Add groups that are in plan but not state
+// Add groups that are in plan but not state.
+func (r *TeamResource) addDesiredGroups(ctx context.Context, desiredSet map[string]bool, actualMappings map[string]string, teamUUID uuid.UUID) diag.Diagnostics {
+	var diags diag.Diagnostics
 	for groupID := range desiredSet {
 		if _, ok := actualMappings[groupID]; !ok {
 			groupUUID, err := uuid.Parse(groupID)
 			if err != nil {
-				diags.AddAttributeError(path.Root("oidc_group_ids"), "Invalid UUID", fmt.Sprintf("Invalid group UUID: %s", groupID))
+				diags.AddAttributeError(path.Root("oidc_group_ids"), "Invalid UUID", "Invalid group UUID: "+groupID)
 				continue
 			}
 
@@ -359,11 +366,13 @@ func (r *TeamResource) syncOIDCMappings(ctx context.Context, plan TeamResourceMo
 			}
 		}
 	}
-	if diags.HasError() {
-		return diags
-	}
 
-	// Remove groups that are in state but not plan
+	return diags
+}
+
+// Remove groups that are in state but not plan.
+func (r *TeamResource) removeExtraGroups(ctx context.Context, desiredSet map[string]bool, actualMappings map[string]string) diag.Diagnostics {
+	var diags diag.Diagnostics
 	for groupID, mappingID := range actualMappings {
 		if !desiredSet[groupID] {
 			mappingUUID, err := uuid.Parse(mappingID)
@@ -377,6 +386,36 @@ func (r *TeamResource) syncOIDCMappings(ctx context.Context, plan TeamResourceMo
 				diags.AddError("Client Error", fmt.Sprintf("Unable to remove OIDC mapping for group %s: %s", groupID, err))
 			}
 		}
+	}
+	return diags
+}
+
+// syncOIDCMappings adds / removes mappings based on plan and state.
+func (r *TeamResource) syncOIDCMappings(ctx context.Context, plan TeamResourceModel, state TeamResourceModel, teamUUID uuid.UUID) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	desiredSet, d := r.formatDesiredGroups(ctx, plan)
+	diags.Append(d...)
+	if diags.HasError() {
+		return diags
+	}
+
+	actualMappings, d := r.formatExistingMappings(ctx, state)
+	diags.Append(d...)
+	if diags.HasError() {
+		return diags
+	}
+
+	d = r.addDesiredGroups(ctx, desiredSet, actualMappings, teamUUID)
+	diags.Append(d...)
+	if diags.HasError() {
+		return diags
+	}
+
+	d = r.removeExtraGroups(ctx, desiredSet, actualMappings)
+	diags.Append(d...)
+	if diags.HasError() {
+		return diags
 	}
 
 	return diags
