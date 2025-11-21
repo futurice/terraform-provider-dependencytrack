@@ -19,6 +19,11 @@ Team
 
 - `name` (String) Name of the team
 
+### Optional
+
+- `oidc_group_ids` (List of String) OIDC group IDs
+
 ### Read-Only
 
 - `id` (String) Team UUID
+- `oidc_group_mappings` (Map of String) Internal map of Group UUIDs to Mapping UUIDs.
