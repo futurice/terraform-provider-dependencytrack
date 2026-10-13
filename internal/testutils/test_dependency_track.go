@@ -5,20 +5,27 @@ package testutils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"testing"
 	"time"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/google/uuid"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/network"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 const ExternalDependencyTrackEndpointEnvVarName = "TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT"
 const ExternalDependencyTrackApikeyEnvVarName = "TF_ACC_EXTERNAL_DEPENDENCY_TRACK_APIKEY" //nolint:gosec // This is just an environment variable name, not actual credentials
 const ShowDependencyTrackContainerLogsEnvVarName = "TF_ACC_SHOW_DEPENDENCY_TRACK_CONTAINER_LOGS"
+const DependencyTrackVersionEnvVarName = "TF_ACC_DEPENDENCY_TRACK_VERSION"
+
+const defaultDependencyTrackVersion = "4.14.5"
 
 const defaultDependencyTrackUser = "admin"
 const defaultDependencyTrackPassword = "admin"
@@ -30,14 +37,23 @@ type TestDependencyTrack struct {
 	APIKey   string
 	Client   *dtrack.Client
 
+	v5        bool
 	config    *testDependencyTrackConfig
-	container testcontainers.Container
+	container *dependencyTrackContainer
 }
 
 type testDependencyTrackConfig struct {
 	endpoint          string
 	apiKey            string
 	showContainerLogs bool
+	version           string
+}
+
+// dependencyTrackContainer is the API server container, plus the PostgreSQL container and network that v5 needs.
+type dependencyTrackContainer struct {
+	apiServer testcontainers.Container
+	postgres  testcontainers.Container
+	network   *testcontainers.DockerNetwork
 }
 
 // InitTestDependencyTrack is a utility function intended to be used within TestMain to
@@ -73,6 +89,8 @@ func InitTestDependencyTrack() (testDependencyTrack *TestDependencyTrack, cleanu
 //     TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT. The API key should have all permissions. This variable must
 //     be defined if TF_ACC_EXTERNAL_DEPENDENCY_TRACK_ENDPOINT is defined, and must not be defined otherwise.
 //
+//   - TF_ACC_DEPENDENCY_TRACK_VERSION - the apiserver image tag to start, 4.14.5 by default; 5+ also starts PostgreSQL.
+//
 //   - TF_ACC_SHOW_DEPENDENCY_TRACK_CONTAINER_LOGS - if set to a non-empty value will cause the
 //     Dependency-Track API server container logs to be printed after each test suite run. Ignored if an extenal
 //     endpoint is configured.
@@ -85,11 +103,54 @@ func NewTestDependencyTrack() (*TestDependencyTrack, error) {
 		return nil, fmt.Errorf("invalid test Dependency-Track configuration: %w", err)
 	}
 
+	var tdt *TestDependencyTrack
 	if config.isExternalDependencyTrackConfigured() {
-		return newTestDependencyTrackFromExternalEndpoint(config)
+		tdt, err = newTestDependencyTrackFromExternalEndpoint(config)
 	} else {
-		return newTestDependencyTrackFromInternalContainer(config)
+		tdt, err = newTestDependencyTrackFromInternalContainer(config)
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := tdt.Client.ServerVersion(context.Background())
+	if err != nil {
+		closeErr := tdt.Close()
+		return nil, errors.Join(fmt.Errorf("could not read Dependency-Track version: %w", err), closeErr)
+	}
+	tdt.v5 = isV5Version(version)
+
+	fmt.Printf("Test Dependency-Track version is %s\n", version)
+
+	return tdt, nil
+}
+
+// IsV5 reports whether the test Dependency-Track runs version 5 or later.
+func (tdt *TestDependencyTrack) IsV5() bool {
+	return tdt.v5
+}
+
+// PublisherKindAttribute returns the HCL line that picks a built-in publisher such as "slack", per server version.
+func (tdt *TestDependencyTrack) PublisherKindAttribute(extension string) string {
+	if tdt.v5 {
+		return fmt.Sprintf("extension_name = %q", extension)
+	}
+	return fmt.Sprintf("publisher_class = %q", PublisherClass(extension))
+}
+
+// WithPublisherKind sets PublisherClass on v4 or ExtensionName on v5, to build an expected publisher.
+func (tdt *TestDependencyTrack) WithPublisherKind(publisher dtrack.NotificationPublisher, extension string) dtrack.NotificationPublisher {
+	if tdt.v5 {
+		publisher.ExtensionName = extension
+	} else {
+		publisher.PublisherClass = PublisherClass(extension)
+	}
+	return publisher
+}
+
+// PublisherClass maps a v5 extension name such as "slack" to its v4 class.
+func PublisherClass(extension string) string {
+	return "org.dependencytrack.notification.publisher." + strings.ToUpper(extension[:1]) + extension[1:] + "Publisher"
 }
 
 // AddProviderConfiguration prepends a provider configuration to a piece of Terraform code (HCL) defining resources.
@@ -140,6 +201,11 @@ func getTestDependencyTrackConfig() (*testDependencyTrackConfig, error) {
 		endpoint:          os.Getenv(ExternalDependencyTrackEndpointEnvVarName),
 		apiKey:            os.Getenv(ExternalDependencyTrackApikeyEnvVarName),
 		showContainerLogs: os.Getenv(ShowDependencyTrackContainerLogsEnvVarName) != "",
+		version:           os.Getenv(DependencyTrackVersionEnvVarName),
+	}
+
+	if config.version == "" {
+		config.version = defaultDependencyTrackVersion
 	}
 
 	if err := config.validate(); err != nil {
@@ -173,7 +239,7 @@ func newTestDependencyTrackFromExternalEndpoint(config *testDependencyTrackConfi
 func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConfig) (*TestDependencyTrack, error) {
 	ctx := context.Background()
 
-	container, err := startDependencyTrackContainer(ctx)
+	container, err := startDependencyTrackContainer(ctx, config.version)
 	if err != nil {
 		return nil, fmt.Errorf("could not start Dependency-Track container: %w", err)
 	}
@@ -195,29 +261,125 @@ func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConf
 	return testDependencyTrack, nil
 }
 
-func startDependencyTrackContainer(ctx context.Context) (testcontainers.Container, error) {
+func isV5Version(version string) bool {
+	return !strings.HasPrefix(version, "4.")
+}
+
+func startDependencyTrackContainer(ctx context.Context, version string) (*dependencyTrackContainer, error) {
+	if isV5Version(version) {
+		return startDependencyTrackV5Container(ctx, version)
+	}
+
 	containerRequest := testcontainers.ContainerRequest{
-		Image:        "dependencytrack/apiserver:4.13.2",
+		Image:        "dependencytrack/apiserver:" + version,
 		ExposedPorts: []string{"8080/tcp"},
 		WaitingFor:   wait.ForLog("Dependency-Track is ready").WithStartupTimeout(2 * time.Minute),
 	}
 
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	apiServer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: containerRequest,
 		Started:          true,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return container, err
+	return &dependencyTrackContainer{apiServer: apiServer}, nil
 }
 
-func stopDependencyTrackContainer(ctx context.Context, config *testDependencyTrackConfig, container testcontainers.Container) error {
+// startDependencyTrackV5Container mirrors the Helm chart's env, since v5 has no embedded database and no "ready" log line.
+func startDependencyTrackV5Container(ctx context.Context, version string) (container *dependencyTrackContainer, err error) {
+	container = &dependencyTrackContainer{}
+	defer func() {
+		if err != nil {
+			if termErr := container.terminate(ctx); termErr != nil {
+				err = fmt.Errorf("%w (also failed to clean up with error %w)", err, termErr)
+			}
+			container = nil
+		}
+	}()
+
+	container.network, err = network.New(ctx)
+	if err != nil {
+		return container, fmt.Errorf("could not create Docker network: %w", err)
+	}
+
+	container.postgres, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:          "postgres:16-alpine",
+			Networks:       []string{container.network.Name},
+			NetworkAliases: map[string][]string{container.network.Name: {"postgres"}},
+			Env: map[string]string{
+				"POSTGRES_DB":       "dtrack",
+				"POSTGRES_USER":     "dtrack",
+				"POSTGRES_PASSWORD": "dtrack",
+			},
+			// The server logs this once during init and once when it's up for real.
+			WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(time.Minute),
+		},
+		Started: true,
+	})
+	if err != nil {
+		return container, fmt.Errorf("could not start PostgreSQL container: %w", err)
+	}
+
+	container.apiServer, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:        "dependencytrack/apiserver:" + version,
+			ExposedPorts: []string{"8080/tcp", "9000/tcp"},
+			Networks:     []string{container.network.Name},
+			Env: map[string]string{ //nolint:gosec // Throwaway test container credentials, not real secrets
+				"DT_DATASOURCE_URL":             "jdbc:postgresql://postgres:5432/dtrack?reWriteBatchedInserts=true",
+				"DT_DATASOURCE_USERNAME":        "dtrack",
+				"DT_DATASOURCE_PASSWORD":        "dtrack",
+				"DT_SECRET_MANAGEMENT_PROVIDER": "database",
+				// Fixed test fixture, base64 of the 32 bytes "dt-v5-acctest-fixture-not-a-real".
+				"DT_SECRET_MANAGEMENT_DATABASE_KEK":       "ZHQtdjUtYWNjdGVzdC1maXh0dXJlLW5vdC1hLXJlYWw=",
+				"DT_FILE_STORAGE_PROVIDER":                "local",
+				"DT_FILE_STORAGE_LOCAL_DIRECTORY":         "/data/storage",
+				"DT_MANAGEMENT_PORT":                      "9000",
+				"DT_TELEMETRY_SUBMISSION_DEFAULT_ENABLED": "false",
+			},
+			// /health answers 200 even when the API failed to start, so wait on the API port too.
+			WaitingFor: wait.ForAll(
+				wait.ForHTTP("/health").WithPort("9000/tcp").WithStartupTimeout(3*time.Minute),
+				wait.ForHTTP("/api/version").WithPort("8080/tcp").WithStartupTimeout(3*time.Minute),
+			),
+		},
+		Started: true,
+	})
+	if err != nil {
+		return container, fmt.Errorf("could not start Dependency-Track API server container: %w", err)
+	}
+
+	return container, nil
+}
+
+func (c *dependencyTrackContainer) terminate(ctx context.Context) error {
+	var errs []error
+	for _, tc := range []testcontainers.Container{c.apiServer, c.postgres} {
+		if tc != nil {
+			if err := tc.Terminate(ctx); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if c.network != nil {
+		if err := c.network.Remove(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func stopDependencyTrackContainer(ctx context.Context, config *testDependencyTrackConfig, container *dependencyTrackContainer) error {
 	if config.showContainerLogs {
-		if err := showDependencyTrackContainerLogs(ctx, container); err != nil {
+		if err := showDependencyTrackContainerLogs(ctx, container.apiServer); err != nil {
 			return fmt.Errorf("could not show Dependency-Track container logs: %w", err)
 		}
 	}
 
-	if err := container.Terminate(ctx); err != nil {
+	if err := container.terminate(ctx); err != nil {
 		return fmt.Errorf("could not stop Dependency-Track container: %w", err)
 	}
 
@@ -243,8 +405,8 @@ func showDependencyTrackContainerLogs(ctx context.Context, container testcontain
 	return nil
 }
 
-func configureDependencyTrackContainer(ctx context.Context, config *testDependencyTrackConfig, container testcontainers.Container) (*TestDependencyTrack, error) {
-	containerEndpoint, err := container.Endpoint(ctx, "http")
+func configureDependencyTrackContainer(ctx context.Context, config *testDependencyTrackConfig, container *dependencyTrackContainer) (*TestDependencyTrack, error) {
+	containerEndpoint, err := container.apiServer.PortEndpoint(ctx, "8080/tcp", "http")
 	if err != nil {
 		return nil, fmt.Errorf("could not get Dependency-Track container endpoint: %w", err)
 	}
@@ -341,4 +503,12 @@ func createAllPowerfulAPIKey(ctx context.Context, client *dtrack.Client) (apiKey
 	fmt.Printf("Created an API key for team %s\n", teamName)
 
 	return apiKey, err
+}
+
+// SkipUnlessV5 skips a test for a resource that only exists on Dependency-Track v5.
+func (tdt *TestDependencyTrack) SkipUnlessV5(t *testing.T) {
+	t.Helper()
+	if !tdt.v5 {
+		t.Skip("requires Dependency-Track v5")
+	}
 }
