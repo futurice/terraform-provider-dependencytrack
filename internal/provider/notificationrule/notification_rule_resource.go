@@ -180,7 +180,10 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	rules, err := r.client.Notification.GetAllRules(ctx)
+	// There is no API method for a single rule, and v5 caps unpaged lists at 100.
+	rules, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+		return r.client.Notification.GetAllRules(ctx, po)
+	})
 	if err != nil {
 		var apiErr *dtrack.APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
