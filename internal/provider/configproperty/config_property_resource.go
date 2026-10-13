@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -18,6 +19,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &ConfigPropertyResource{}
 var _ resource.ResourceWithImportState = &ConfigPropertyResource{}
+var _ resource.ResourceWithModifyPlan = &ConfigPropertyResource{}
 
 func NewConfigPropertyResource() resource.Resource {
 	return &ConfigPropertyResource{}
@@ -44,7 +46,7 @@ func (r *ConfigPropertyResource) Metadata(ctx context.Context, req resource.Meta
 
 func (r *ConfigPropertyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Configuration property",
+		MarkdownDescription: "Configuration property. Dependency-Track v4 only. On v5, use `dependencytrack_extension_config` and `dependencytrack_secret`, and remove these resources from the configuration.",
 
 		Attributes: map[string]schema.Attribute{
 			"group_name": schema.StringAttribute{
@@ -103,6 +105,20 @@ func (r *ConfigPropertyResource) Configure(ctx context.Context, req resource.Con
 	r.client = client
 }
 
+func (r *ConfigPropertyResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Destroy plans must keep working on v5, so the migration can remove these resources.
+	if req.Plan.Raw.IsNull() || r.client == nil {
+		return
+	}
+
+	v5, diags := utils.IsV5(ctx, r.client)
+	resp.Diagnostics.Append(diags...)
+	if !diags.HasError() && v5 {
+		resp.Diagnostics.AddError("Unsupported Resource",
+			"dependencytrack_config_property requires Dependency-Track v4. On v5, use dependencytrack_extension_config for analyzer and data source settings, and dependencytrack_secret for their tokens.")
+	}
+}
+
 func (r *ConfigPropertyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan, state ConfigPropertyResourceModel
 
@@ -153,6 +169,17 @@ func (r *ConfigPropertyResource) Read(ctx context.Context, req resource.ReadRequ
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// v5 has none of the v4 properties, so state carried over from v4 just goes away.
+	v5, diags := utils.IsV5(ctx, r.client)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if v5 {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
@@ -216,6 +243,17 @@ func (r *ConfigPropertyResource) Delete(ctx context.Context, req resource.Delete
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// There is nothing to restore on v5, where the property no longer exists.
+	v5, diags := utils.IsV5(ctx, r.client)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if v5 {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 

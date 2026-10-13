@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
@@ -29,6 +30,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestAccConfigPropertyResource_basic(t *testing.T) {
+	skipOnV5(t)
 	ctx := testutils.CreateTestContext(t)
 
 	groupName := "email"
@@ -79,6 +81,7 @@ func TestAccConfigPropertyResource_basic(t *testing.T) {
 }
 
 func TestAccConfigPropertyResource_destroyValue(t *testing.T) {
+	skipOnV5(t)
 	ctx := testutils.CreateTestContext(t)
 
 	groupName := "email"
@@ -130,6 +133,7 @@ func TestAccConfigPropertyResource_destroyValue(t *testing.T) {
 }
 
 func TestAccConfigPropertyResource_changeProperty(t *testing.T) {
+	skipOnV5(t)
 	ctx := testutils.CreateTestContext(t)
 
 	groupName := "email"
@@ -182,6 +186,30 @@ func TestAccConfigPropertyResource_changeProperty(t *testing.T) {
 		},
 		CheckDestroy: testAccCheckConfigPropertyHasExpectedValue(ctx, testDependencyTrack, otherGroupName, otherName, otherOriginalValue),
 	})
+}
+
+func TestAccConfigPropertyResource_rejectedOnV5(t *testing.T) {
+	if !testDependencyTrack.IsV5() {
+		t.Skip("checks the error on Dependency-Track v5")
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccConfigPropertyConfigBasic(testDependencyTrack, "scanner", "trivy.enabled", "true"),
+				ExpectError: regexp.MustCompile("requires Dependency-Track v4"),
+			},
+		},
+	})
+}
+
+func skipOnV5(t *testing.T) {
+	t.Helper()
+	if testDependencyTrack.IsV5() {
+		t.Skip("config properties only exist on Dependency-Track v4")
+	}
 }
 
 func testAccConfigPropertyConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, groupName, name, value string) string {
