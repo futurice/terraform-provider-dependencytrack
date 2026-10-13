@@ -4,6 +4,7 @@
 package notificationrule_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -278,6 +279,75 @@ func TestAccNotificationRuleResource_settings(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestAccNotificationRuleResource_keepsTagsAndFilterExpression(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
+
+	ruleResourceName := notificationruletestutils.CreateNotificationRuleResourceName("test")
+	ruleName := acctest.RandomWithPrefix("test-notification-rule")
+	filterExpression := `subject.project.name == "x"`
+	var ruleID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNotificationRuleConfigBasic(testDependencyTrack, testPublisher.Name, ruleName, "PORTFOLIO", "INFORMATIONAL"),
+				Check:  testutils.TestAccCheckGetResourceID(ruleResourceName, &ruleID),
+			},
+			{
+				// Set what the UI would, then change the rule through Terraform.
+				PreConfig: func() { setTagsAndFilterExpression(ctx, t, ruleID, filterExpression) },
+				Config:    testAccNotificationRuleConfigBasic(testDependencyTrack, testPublisher.Name, ruleName, "PORTFOLIO", "WARNING"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(ruleResourceName, "notification_level", "WARNING"),
+					checkTagsAndFilterExpression(ctx, ruleResourceName, filterExpression),
+				),
+			},
+		},
+	})
+}
+
+// setTagsAndFilterExpression sets what the UI would: a tag, and on v5 a filter expression.
+func setTagsAndFilterExpression(ctx context.Context, t *testing.T, ruleID, filterExpression string) {
+	t.Helper()
+
+	rule, err := notificationruletestutils.FindNotificationRule(ctx, testDependencyTrack, uuid.MustParse(ruleID))
+	if err != nil {
+		t.Fatalf("unable to find rule %s: %v", ruleID, err)
+	}
+	if rule == nil {
+		t.Fatalf("rule %s not found", ruleID)
+	}
+
+	rule.Tags = []dtrack.Tag{{Name: "keep-me"}}
+	if testDependencyTrack.IsV5() {
+		rule.FilterExpression = filterExpression
+	}
+	if _, err := testDependencyTrack.Client.Notification.UpdateRule(ctx, *rule); err != nil {
+		t.Fatalf("unable to set tags: %v", err)
+	}
+}
+
+func checkTagsAndFilterExpression(ctx context.Context, resourceName, filterExpression string) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		rule, err := notificationruletestutils.FindNotificationRuleByResourceName(ctx, testDependencyTrack, state, resourceName)
+		if err != nil {
+			return err
+		}
+		if rule == nil {
+			return fmt.Errorf("rule for %s not found", resourceName)
+		}
+		if len(rule.Tags) != 1 || rule.Tags[0].Name != "keep-me" {
+			return fmt.Errorf("expected the tag to survive the update, got %v", rule.Tags)
+		}
+		if testDependencyTrack.IsV5() && rule.FilterExpression != filterExpression {
+			return fmt.Errorf("expected the filter expression to survive the update, got %q", rule.FilterExpression)
+		}
+		return nil
+	}
 }
 
 func TestAccNotificationRuleResource_failedUpdateTaintsRule(t *testing.T) {

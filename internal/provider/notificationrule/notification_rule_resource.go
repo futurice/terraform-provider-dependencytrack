@@ -184,10 +184,7 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	// There is no API method for a single rule, and v5 caps unpaged lists at 100.
-	rules, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
-		return r.client.Notification.GetAllRules(ctx, po)
-	})
+	rule, err := r.findRule(ctx, state.ID.ValueString())
 	if err != nil {
 		var apiErr *dtrack.APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
@@ -199,23 +196,34 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	found := false
-	for _, rule := range rules {
-		if rule.UUID.String() == state.ID.ValueString() {
-			found = true
-			newState, diags := DTRuleToTFRule(ctx, rule)
-			resp.Diagnostics.Append(diags...)
-			state = keepEquivalentPublisherConfig(newState, state)
-			break
-		}
-	}
-
-	if !found {
+	if rule == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
+	newState, diags := DTRuleToTFRule(ctx, *rule)
+	resp.Diagnostics.Append(diags...)
+	state = keepEquivalentPublisherConfig(newState, state)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// findRule returns the rule with the given UUID, or nil if there is none.
+func (r *NotificationRuleResource) findRule(ctx context.Context, id string) (*dtrack.NotificationRule, error) {
+	// There is no API method for a single rule, and v5 caps unpaged lists at 100.
+	rules, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+		return r.client.Notification.GetAllRules(ctx, po)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range rules {
+		if rules[i].UUID.String() == id {
+			return &rules[i], nil
+		}
+	}
+	return nil, nil
 }
 
 func (r *NotificationRuleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -230,6 +238,18 @@ func (r *NotificationRuleResource) Update(ctx context.Context, req resource.Upda
 
 	dtRule, diags := TFRuleToDTRule(ctx, plan)
 	resp.Diagnostics.Append(diags...)
+
+	// An update overwrites the tags, and on v5 the filter expression. Neither is managed here, so keep
+	// whatever the rule has, e.g. from the UI.
+	current, err := r.findRule(ctx, state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read notification rule, got error: %s", err))
+		return
+	}
+	if current != nil {
+		dtRule.FilterExpression = current.FilterExpression
+		dtRule.Tags = current.Tags
+	}
 
 	respRule, err := r.client.Notification.UpdateRule(ctx, dtRule)
 	if err != nil {
