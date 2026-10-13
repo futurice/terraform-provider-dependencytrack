@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/futurice/terraform-provider-dependencytrack/internal/testutils"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -23,9 +24,9 @@ import (
 var testPublisher, testOtherPublisher dtrack.NotificationPublisher
 
 func init() {
+	// PublisherClass or ExtensionName is filled in by applyTestPublisherToRule, once the server version is known.
 	testPublisher = dtrack.NotificationPublisher{
 		Name:             acctest.RandomWithPrefix("test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.SlackPublisher",
 		TemplateMimeType: "application/json",
 		Template:         `{}`,
 	}
@@ -61,7 +62,7 @@ func TestAccNotificationRuleResource_basic(t *testing.T) {
 		NotifyChildren:       true,
 		NotifyOn:             []string{},
 		LogSuccessfulPublish: false,
-		PublisherConfig:      "",
+		PublisherConfig:      defaultPublisherConfig(),
 	}
 
 	testUpdatedRule := testRule
@@ -90,7 +91,7 @@ func TestAccNotificationRuleResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(ruleResourceName, "notify_children", strconv.FormatBool(testRule.NotifyChildren)),
 					resource.TestCheckResourceAttr(ruleResourceName, "notify_on.#", "0"),
 					resource.TestCheckResourceAttr(ruleResourceName, "log_successful_publish", strconv.FormatBool(testRule.LogSuccessfulPublish)),
-					resource.TestCheckNoResourceAttr(ruleResourceName, "publisher_config"),
+					checkDefaultPublisherConfig(ruleResourceName),
 				),
 			},
 			{
@@ -129,7 +130,7 @@ func TestAccNotificationRuleResource_publisherID(t *testing.T) {
 		NotifyChildren:       true,
 		NotifyOn:             []string{},
 		LogSuccessfulPublish: false,
-		PublisherConfig:      "",
+		PublisherConfig:      defaultPublisherConfig(),
 	}
 
 	var publisherID, otherPublisherID string
@@ -177,7 +178,7 @@ func TestAccNotificationRuleResource_scope(t *testing.T) {
 		NotifyChildren:       true,
 		NotifyOn:             []string{},
 		LogSuccessfulPublish: false,
-		PublisherConfig:      "",
+		PublisherConfig:      defaultPublisherConfig(),
 	}
 
 	testUpdatedRule := testRule
@@ -227,7 +228,7 @@ func TestAccNotificationRuleResource_settings(t *testing.T) {
 		NotifyChildren:       false,
 		NotifyOn:             []string{"USER_DELETED"},
 		LogSuccessfulPublish: true,
-		PublisherConfig:      `{"a": "b"}`,
+		PublisherConfig:      slackPublisherConfig("b"),
 	}
 
 	testUpdatedRule := testRule
@@ -235,7 +236,7 @@ func TestAccNotificationRuleResource_settings(t *testing.T) {
 	testUpdatedRule.NotifyChildren = true
 	testUpdatedRule.NotifyOn = []string{"NEW_VULNERABLE_DEPENDENCY", "PROJECT_CREATED"}
 	testUpdatedRule.LogSuccessfulPublish = false
-	testUpdatedRule.PublisherConfig = `{"a": "c"}`
+	testUpdatedRule.PublisherConfig = slackPublisherConfig("c")
 
 	var publisherID string
 
@@ -283,12 +284,12 @@ func testAccNotificationRuleConfigBasic(testDependencyTrack *testutils.TestDepen
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[2]s
 	template_mime_type = "application/json"
 	template           = "{}"
 }
 `,
-				providerName,
+				providerName, testDependencyTrack.PublisherKindAttribute("slack"),
 			),
 			fmt.Sprintf(`
 resource "dependencytrack_notification_rule" "test" {
@@ -310,22 +311,22 @@ func testAccNotificationRuleConfigOtherPublisher(testDependencyTrack *testutils.
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[2]s
 	template_mime_type = "application/json"
 	template           = "{}"
 }
 `,
-				providerName,
+				providerName, testDependencyTrack.PublisherKindAttribute("slack"),
 			),
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test-other" {
 	name               = "%[1]s-other"
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[2]s
 	template_mime_type = "application/json"
 	template           = "{}"
 }
 `,
-				providerName,
+				providerName, testDependencyTrack.PublisherKindAttribute("slack"),
 			),
 			fmt.Sprintf(`
 resource "dependencytrack_notification_rule" "test" {
@@ -353,12 +354,12 @@ func testAccNotificationRuleConfigWithSettings(testDependencyTrack *testutils.Te
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[2]s
 	template_mime_type = "application/json"
 	template           = "{}"
 }
 `,
-				providerName,
+				providerName, testDependencyTrack.PublisherKindAttribute("slack"),
 			),
 			fmt.Sprintf(`
 resource "dependencytrack_notification_rule" "test" {
@@ -387,9 +388,35 @@ resource "dependencytrack_notification_rule" "test" {
 }
 
 func applyTestPublisherToRule(ruleTemplate dtrack.NotificationRule, publisherTemplate dtrack.NotificationPublisher, publisherID *string) dtrack.NotificationRule {
-	publisherWithID := publisherTemplate
+	publisherWithID := testDependencyTrack.WithPublisherKind(publisherTemplate, "slack")
 	publisherWithID.UUID = uuid.MustParse(*publisherID)
 	ruleWithPublisher := ruleTemplate
 	ruleWithPublisher.Publisher = publisherWithID
 	return ruleWithPublisher
+}
+
+// defaultPublisherConfig is the Slack config a rule gets when none is set, which v5 fills in on create.
+func defaultPublisherConfig() string {
+	if testDependencyTrack.IsV5() {
+		return `{"destinationUrl": "https://slack.example.com"}`
+	}
+	return ""
+}
+
+func checkDefaultPublisherConfig(resourceName string) resource.TestCheckFunc {
+	if testDependencyTrack.IsV5() {
+		// The update response and the rule list format the same JSON differently.
+		return resource.TestCheckResourceAttrWith(resourceName, "publisher_config", func(value string) error {
+			if !utils.JSONEqual(value, defaultPublisherConfig()) {
+				return fmt.Errorf("expected publisher_config equivalent to %s, got %s", defaultPublisherConfig(), value)
+			}
+			return nil
+		})
+	}
+	return resource.TestCheckNoResourceAttr(resourceName, "publisher_config")
+}
+
+// slackPublisherConfig returns a config v5 accepts for the Slack publisher, which v4 stores as is.
+func slackPublisherConfig(path string) string {
+	return fmt.Sprintf(`{"destinationUrl": "https://example.com/%s"}`, path)
 }

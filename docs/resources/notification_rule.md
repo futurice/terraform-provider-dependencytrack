@@ -28,7 +28,7 @@ Notification rule
 - `log_successful_publish` (Boolean)
 - `notify_children` (Boolean)
 - `notify_on` (Set of String)
-- `publisher_config` (String) Publisher configuration in JSON format
+- `publisher_config` (String) Publisher configuration in JSON format. Dependency-Track v5 validates it against the publisher's rule config schema and fills in a default when it's omitted.
 
 ### Read-Only
 
