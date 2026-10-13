@@ -92,12 +92,12 @@ func testAccNotificationRuleProjectConfigBasic(testDependencyTrack *testutils.Te
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[2]s
 	template_mime_type = "application/json"
 	template           = "{}"
 }
 `,
-				providerName,
+				providerName, testDependencyTrack.PublisherKindAttribute("slack"),
 			),
 			fmt.Sprintf(`
 resource "dependencytrack_notification_rule" "test" {
@@ -133,12 +133,12 @@ func testAccNotificationRuleProjectConfigOtherRuleAndProject(testDependencyTrack
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[2]s
 	template_mime_type = "application/json"
 	template           = "{}"
 }
 `,
-				providerName,
+				providerName, testDependencyTrack.PublisherKindAttribute("slack"),
 			),
 			fmt.Sprintf(`
 resource "dependencytrack_notification_rule" "test" {
@@ -192,12 +192,12 @@ func testAccNotificationRuleProjectConfigNoProject(testDependencyTrack *testutil
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[2]s
 	template_mime_type = "application/json"
 	template           = "{}"
 }
 `,
-				providerName,
+				providerName, testDependencyTrack.PublisherKindAttribute("slack"),
 			),
 			fmt.Sprintf(`
 resource "dependencytrack_notification_rule" "test" {

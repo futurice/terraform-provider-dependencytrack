@@ -26,6 +26,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &NotificationPublisherResource{}
 var _ resource.ResourceWithImportState = &NotificationPublisherResource{}
+var _ resource.ResourceWithModifyPlan = &NotificationPublisherResource{}
 
 func NewNotificationPublisherResource() resource.Resource {
 	return &NotificationPublisherResource{}
@@ -42,6 +43,7 @@ type NotificationPublisherResourceModel struct {
 	Name             types.String `tfsdk:"name"`
 	Description      types.String `tfsdk:"description"`
 	PublisherClass   types.String `tfsdk:"publisher_class"`
+	ExtensionName    types.String `tfsdk:"extension_name"`
 	TemplateMimeType types.String `tfsdk:"template_mime_type"`
 	Template         types.String `tfsdk:"template"`
 }
@@ -75,8 +77,12 @@ func (r *NotificationPublisherResource) Schema(ctx context.Context, req resource
 				Required:            true,
 			},
 			"publisher_class": schema.StringAttribute{
-				MarkdownDescription: "Class of the publisher",
-				Required:            true,
+				MarkdownDescription: "Class of the publisher, e.g. `org.dependencytrack.notification.publisher.SlackPublisher`. Dependency-Track v4 only, use `extension_name` on v5.",
+				Optional:            true,
+			},
+			"extension_name": schema.StringAttribute{
+				MarkdownDescription: "Extension of the publisher, e.g. `slack` or `webhook`. Dependency-Track v5 only, use `publisher_class` on v4.",
+				Optional:            true,
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "Description of the publisher",
@@ -103,6 +109,40 @@ func (r *NotificationPublisherResource) Configure(ctx context.Context, req resou
 	}
 
 	r.client = client
+}
+
+func (r *NotificationPublisherResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || r.client == nil {
+		return
+	}
+
+	var config NotificationPublisherResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() || config.PublisherClass.IsUnknown() || config.ExtensionName.IsUnknown() {
+		return
+	}
+
+	v5, diags := utils.IsV5(ctx, r.client)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	wanted, unwanted := path.Root("publisher_class"), path.Root("extension_name")
+	wantedValue, unwantedValue := config.PublisherClass, config.ExtensionName
+	version := "v4"
+	if v5 {
+		wanted, unwanted = unwanted, wanted
+		wantedValue, unwantedValue = unwantedValue, wantedValue
+		version = "v5"
+	}
+
+	if wantedValue.IsNull() {
+		resp.Diagnostics.AddAttributeError(wanted, "Missing Attribute", fmt.Sprintf("Dependency-Track %s requires %s.", version, wanted))
+	}
+	if !unwantedValue.IsNull() {
+		resp.Diagnostics.AddAttributeError(unwanted, "Unsupported Attribute", fmt.Sprintf("Dependency-Track %s does not support %s, set %s instead.", version, unwanted, wanted))
+	}
 }
 
 func (r *NotificationPublisherResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -226,7 +266,8 @@ func DTPublisherToTFPublisher(ctx context.Context, dtPublisher dtrack.Notificati
 	publisher := NotificationPublisherResourceModel{
 		ID:               types.StringValue(dtPublisher.UUID.String()),
 		Name:             types.StringValue(dtPublisher.Name),
-		PublisherClass:   types.StringValue(dtPublisher.PublisherClass),
+		PublisherClass:   utils.StringValueOrNull(dtPublisher.PublisherClass),
+		ExtensionName:    utils.StringValueOrNull(dtPublisher.ExtensionName),
 		TemplateMimeType: types.StringValue(dtPublisher.TemplateMimeType),
 		Template:         types.StringValue(dtPublisher.Template),
 	}
@@ -248,6 +289,7 @@ func TFPublisherToDTPublisher(ctx context.Context, tfPublisher NotificationPubli
 		Name:             tfPublisher.Name.ValueString(),
 		Description:      tfPublisher.Description.ValueString(),
 		PublisherClass:   tfPublisher.PublisherClass.ValueString(),
+		ExtensionName:    tfPublisher.ExtensionName.ValueString(),
 		TemplateMimeType: tfPublisher.TemplateMimeType.ValueString(),
 		Template:         tfPublisher.Template.ValueString(),
 	}

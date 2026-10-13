@@ -22,7 +22,6 @@ func TestAccNotificationPublisherDataSource_basic(t *testing.T) {
 
 	testPublisher := dtrack.NotificationPublisher{
 		Name:             acctest.RandomWithPrefix("test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.SlackPublisher",
 		TemplateMimeType: "application/json",
 		Template:         `{}`,
 		DefaultPublisher: false,
@@ -36,12 +35,12 @@ func TestAccNotificationPublisherDataSource_basic(t *testing.T) {
 		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNotificationPublisherDataSourceConfigBasic(testDependencyTrack, testPublisher.Name, testPublisher.PublisherClass, testPublisher.TemplateMimeType, testPublisher.Template, testPublisher.Description),
+				Config: testAccNotificationPublisherDataSourceConfigBasic(testDependencyTrack, testPublisher.Name, testDependencyTrack.PublisherKindAttribute("slack"), testPublisher.TemplateMimeType, testPublisher.Template, testPublisher.Description),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testutils.TestAccCheckGetResourceID(publisherResourceName, &publisherID),
 					resource.TestCheckResourceAttrPtr(publisherDataSourceName, "id", &publisherID),
 					resource.TestCheckResourceAttr(publisherDataSourceName, "name", testPublisher.Name),
-					resource.TestCheckResourceAttr(publisherDataSourceName, "publisher_class", testPublisher.PublisherClass),
+					notificationpublishertestutils.TestCheckPublisherKind(testDependencyTrack, publisherDataSourceName, "slack"),
 					resource.TestCheckResourceAttr(publisherDataSourceName, "template_mime_type", testPublisher.TemplateMimeType),
 					resource.TestCheckResourceAttr(publisherDataSourceName, "template", testPublisher.Template),
 					resource.TestCheckResourceAttr(publisherDataSourceName, "default_publisher", strconv.FormatBool(testPublisher.DefaultPublisher)),
@@ -65,19 +64,19 @@ func TestAccNotificationPublisherDataSource_notFound(t *testing.T) {
 	})
 }
 
-func testAccNotificationPublisherDataSourceConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, publisherName, publisherClass, templateMimeType, template, description string) string {
+func testAccNotificationPublisherDataSourceConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, publisherName, publisherKind, templateMimeType, template, description string) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		testutils.ComposeConfigs(
 			fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = %[2]q
+	%[2]s
 	template_mime_type = %[3]q
 	template           = %[4]q
 	description        = %[5]q
 }
 `,
-				publisherName, publisherClass, templateMimeType, template, description,
+				publisherName, publisherKind, templateMimeType, template, description,
 			),
 			`
 data "dependencytrack_notification_publisher" "test" {

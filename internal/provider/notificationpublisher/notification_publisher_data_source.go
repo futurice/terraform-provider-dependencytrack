@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -32,6 +33,7 @@ type NotificationPublisherDataSourceModel struct {
 	Name             types.String `tfsdk:"name"`
 	Description      types.String `tfsdk:"description"`
 	PublisherClass   types.String `tfsdk:"publisher_class"`
+	ExtensionName    types.String `tfsdk:"extension_name"`
 	Template         types.String `tfsdk:"template"`
 	TemplateMimeType types.String `tfsdk:"template_mime_type"`
 	DefaultPublisher types.Bool   `tfsdk:"default_publisher"`
@@ -55,7 +57,11 @@ func (d *NotificationPublisherDataSource) Schema(ctx context.Context, req dataso
 				Computed:            true,
 			},
 			"publisher_class": schema.StringAttribute{
-				MarkdownDescription: "Class of the publisher",
+				MarkdownDescription: "Class of the publisher. Null on Dependency-Track v5.",
+				Computed:            true,
+			},
+			"extension_name": schema.StringAttribute{
+				MarkdownDescription: "Extension of the publisher, e.g. `slack`. Null on Dependency-Track v4.",
 				Computed:            true,
 			},
 			"template": schema.StringAttribute{
@@ -117,7 +123,8 @@ func (d *NotificationPublisherDataSource) Read(ctx context.Context, req datasour
 			state.ID = types.StringValue(publisher.UUID.String())
 			state.Name = types.StringValue(publisher.Name)
 			state.Description = types.StringValue(publisher.Description)
-			state.PublisherClass = types.StringValue(publisher.PublisherClass)
+			state.PublisherClass = utils.StringValueOrNull(publisher.PublisherClass)
+			state.ExtensionName = utils.StringValueOrNull(publisher.ExtensionName)
 			state.Template = types.StringValue(publisher.Template)
 			state.TemplateMimeType = types.StringValue(publisher.TemplateMimeType)
 			state.DefaultPublisher = types.BoolValue(publisher.DefaultPublisher)

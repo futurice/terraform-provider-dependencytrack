@@ -18,13 +18,14 @@ Notification publisher
 ### Required
 
 - `name` (String) Name of the publisher
-- `publisher_class` (String) Class of the publisher
 - `template` (String) Template used by the publisher
 - `template_mime_type` (String) MIME type of the template
 
 ### Optional
 
 - `description` (String) Description of the publisher
+- `extension_name` (String) Extension of the publisher, e.g. `slack` or `webhook`. Dependency-Track v5 only, use `publisher_class` on v4.
+- `publisher_class` (String) Class of the publisher, e.g. `org.dependencytrack.notification.publisher.SlackPublisher`. Dependency-Track v4 only, use `extension_name` on v5.
 
 ### Read-Only
 
