@@ -157,6 +157,14 @@ func (r *NotificationRuleResource) Create(ctx context.Context, req resource.Crea
 	respRule, err := r.client.Notification.CreateRule(ctx, dtRule)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create notification rule, got error: %s", err))
+
+		// The rule exists if only the follow-up update failed. Saving it marks it tainted, so the next apply
+		// replaces it instead of creating a duplicate.
+		if respRule.UUID != uuid.Nil {
+			created, createdDiags := DTRuleToTFRule(ctx, respRule)
+			resp.Diagnostics.Append(createdDiags...)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &created)...)
+		}
 		return
 	}
 

@@ -6,6 +6,7 @@ package notificationrule_test
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 var testPublisher, testOtherPublisher dtrack.NotificationPublisher
@@ -273,6 +275,57 @@ func TestAccNotificationRuleResource_settings(t *testing.T) {
 					resource.TestCheckResourceAttr(ruleResourceName, "log_successful_publish", strconv.FormatBool(testUpdatedRule.LogSuccessfulPublish)),
 					resource.TestCheckResourceAttr(ruleResourceName, "publisher_config", testUpdatedRule.PublisherConfig),
 				),
+			},
+		},
+	})
+}
+
+func TestAccNotificationRuleResource_failedUpdateTaintsRule(t *testing.T) {
+	if !testDependencyTrack.IsV5() {
+		t.Skip("only v5 validates publisher_config, which is what makes the follow-up update fail")
+	}
+	ctx := testutils.CreateTestContext(t)
+
+	rule := dtrack.NotificationRule{
+		Name:              acctest.RandomWithPrefix("test-notification-rule"),
+		NotificationLevel: "INFORMATIONAL",
+		Scope:             "PORTFOLIO",
+		Enabled:           true,
+		NotifyOn:          []string{"NEW_VULNERABILITY"},
+		PublisherConfig:   `{}`,
+	}
+	validRule := rule
+	validRule.PublisherConfig = slackPublisherConfig("tainted")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccNotificationRuleConfigWithSettings(testDependencyTrack, testPublisher.Name, rule),
+				ExpectError: regexp.MustCompile(`follow-up\s+update\s+failed`),
+			},
+			{
+				// The tainted rule is replaced, so exactly one rule has the name.
+				Config: testAccNotificationRuleConfigWithSettings(testDependencyTrack, testPublisher.Name, validRule),
+				Check: func(*terraform.State) error {
+					rules, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+						return testDependencyTrack.Client.Notification.GetAllRules(ctx, po)
+					})
+					if err != nil {
+						return err
+					}
+					count := 0
+					for _, r := range rules {
+						if r.Name == rule.Name {
+							count++
+						}
+					}
+					if count != 1 {
+						return fmt.Errorf("expected 1 rule named %s, found %d", rule.Name, count)
+					}
+					return nil
+				},
 			},
 		},
 	})
