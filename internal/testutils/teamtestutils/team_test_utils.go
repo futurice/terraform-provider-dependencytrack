@@ -174,12 +174,14 @@ func FindTeamByResourceName(ctx context.Context, testDependencyTrack *testutils.
 func FindTeam(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, teamID uuid.UUID) (*dtrack.Team, error) {
 	// Currently the endpoint for getting one team does not return most of the data
 	//   see https://github.com/DependencyTrack/dependency-track/issues/4000
-	teams, err := testDependencyTrack.Client.Team.GetAll(ctx, dtrack.PageOptions{})
+	teams, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.Team], error) {
+		return testDependencyTrack.Client.Team.GetAll(ctx, po)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get teams from Dependency-Track: %w", err)
 	}
 
-	for _, team := range teams.Items {
+	for _, team := range teams {
 		if team.UUID == teamID {
 			// normalize the returned object not to contain empty array references
 			if len(team.Permissions) == 0 {
