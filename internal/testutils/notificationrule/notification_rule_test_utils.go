@@ -30,7 +30,7 @@ func TestAccCheckNotificationRuleExistsAndHasExpectedLazyData(ctx context.Contex
 		}
 
 		// Publisher.Template not returned from this endpoint for some reason
-		diff := cmp.Diff(rule, &expectedRule, cmpopts.IgnoreFields(dtrack.NotificationRule{}, "UUID", "Projects", "Publisher.Template"))
+		diff := cmp.Diff(rule, &expectedRule, cmpopts.IgnoreFields(dtrack.NotificationRule{}, "UUID", "Projects", "Publisher.Template"), cmpopts.EquateEmpty())
 		if diff != "" {
 			return fmt.Errorf("notification rule for resource %s is different than expected: %s", resourceName, diff)
 		}
