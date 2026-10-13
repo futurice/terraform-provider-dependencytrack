@@ -8,6 +8,7 @@ import (
 	dtrack "github.com/futurice/dependency-track-client-go"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/aclmapping"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/configproperty"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/extensionconfig"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationpublisher"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationrule"
 	"github.com/futurice/terraform-provider-dependencytrack/internal/provider/notificationruleproject"
@@ -115,6 +116,7 @@ func (p *DependencyTrackProvider) Resources(ctx context.Context) []func() resour
 		notificationruleproject.NewNotificationRuleProjectResource,
 		notificationpublisher.NewNotificationPublisherResource,
 		secret.NewSecretResource,
+		extensionconfig.NewExtensionConfigResource,
 	}
 }
 
