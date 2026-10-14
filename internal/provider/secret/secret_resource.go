@@ -74,8 +74,9 @@ func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				WriteOnly:           true,
 			},
 			"value_wo_version": schema.Int64Attribute{
-				MarkdownDescription: "Change this to send a new `value_wo` to Dependency-Track, since Terraform can't compare write-only values.",
-				Optional:            true,
+				MarkdownDescription: "Change this to send a new `value_wo` to Dependency-Track, since Terraform can't compare write-only values. " +
+					"Required, so a changed value can't be left unsent. A hash of the value, such as `parseint(substr(sha256(var.token), 0, 12), 16)`, changes with it.",
+				Required: true,
 			},
 		},
 	}

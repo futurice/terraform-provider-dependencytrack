@@ -19,8 +19,8 @@ Secret that extension and notification config fields reference by name. Dependen
 
 - `name` (String) Name of the secret, unique across Dependency-Track. Up to 64 letters, digits, `_` and `-`.
 - `value_wo` (String, Sensitive) Value of the secret. Write-only, so it never reaches the Terraform state. Requires Terraform 1.11 or later.
+- `value_wo_version` (Number) Change this to send a new `value_wo` to Dependency-Track, since Terraform can't compare write-only values. Required, so a changed value can't be left unsent. A hash of the value, such as `parseint(substr(sha256(var.token), 0, 12), 16)`, changes with it.
 
 ### Optional
 
 - `description` (String) Description of the secret
-- `value_wo_version` (Number) Change this to send a new `value_wo` to Dependency-Track, since Terraform can't compare write-only values.
