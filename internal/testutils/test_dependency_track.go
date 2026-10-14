@@ -130,14 +130,15 @@ func NewTestDependencyTrack() (*TestDependencyTrack, error) {
 	return tdt, nil
 }
 
-// IsV5 reports whether the test Dependency-Track runs version 5 or later.
+// IsV5 reports whether the test Dependency-Track runs version 5 or later. It is false on a nil
+// TestDependencyTrack, which is what TestMain leaves when TF_ACC is unset, so tests can call it before resource.Test skips them.
 func (tdt *TestDependencyTrack) IsV5() bool {
-	return tdt.v5
+	return tdt != nil && tdt.v5
 }
 
 // PublisherKindAttribute returns the HCL line that picks a built-in publisher such as "slack", per server version.
 func (tdt *TestDependencyTrack) PublisherKindAttribute(extension string) string {
-	if tdt.v5 {
+	if tdt.IsV5() {
 		return fmt.Sprintf("extension_name = %q", extension)
 	}
 	return fmt.Sprintf("publisher_class = %q", PublisherClass(extension))
@@ -145,7 +146,7 @@ func (tdt *TestDependencyTrack) PublisherKindAttribute(extension string) string 
 
 // WithPublisherKind sets PublisherClass on v4 or ExtensionName on v5, to build an expected publisher.
 func (tdt *TestDependencyTrack) WithPublisherKind(publisher dtrack.NotificationPublisher, extension string) dtrack.NotificationPublisher {
-	if tdt.v5 {
+	if tdt.IsV5() {
 		publisher.ExtensionName = extension
 	} else {
 		publisher.PublisherClass = PublisherClass(extension)
@@ -159,7 +160,12 @@ func PublisherClass(extension string) string {
 }
 
 // AddProviderConfiguration prepends a provider configuration to a piece of Terraform code (HCL) defining resources.
+// On a nil TestDependencyTrack it returns the code unchanged, since resource.Test skips the test without TF_ACC anyway.
 func (tdt *TestDependencyTrack) AddProviderConfiguration(terraformCode string) string {
+	if tdt == nil {
+		return terraformCode
+	}
+
 	return fmt.Sprintf(`
 provider "dependencytrack" {
   host    = %[1]q
@@ -513,7 +519,7 @@ func createAllPowerfulAPIKey(ctx context.Context, client *dtrack.Client) (apiKey
 // SkipUnlessV5 skips a test for a resource that only exists on Dependency-Track v5.
 func (tdt *TestDependencyTrack) SkipUnlessV5(t *testing.T) {
 	t.Helper()
-	if !tdt.v5 {
+	if !tdt.IsV5() {
 		t.Skip("requires Dependency-Track v5")
 	}
 }

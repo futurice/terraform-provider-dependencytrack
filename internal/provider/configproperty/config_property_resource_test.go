@@ -205,8 +205,12 @@ func TestAccConfigPropertyResource_rejectedOnV5(t *testing.T) {
 	})
 }
 
+// skipOnV5 also skips without TF_ACC, because these tests call Dependency-Track before resource.Test can skip them.
 func skipOnV5(t *testing.T) {
 	t.Helper()
+	if testDependencyTrack == nil {
+		t.Skip("acceptance test, set TF_ACC to run it")
+	}
 	if testDependencyTrack.IsV5() {
 		t.Skip("config properties only exist on Dependency-Track v4")
 	}
