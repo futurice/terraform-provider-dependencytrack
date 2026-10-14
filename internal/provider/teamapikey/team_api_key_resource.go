@@ -5,7 +5,9 @@ package teamapikey
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
@@ -124,24 +126,30 @@ func (r *TeamAPIKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	// NOTE: API only returns the API keys for the team when fetching all the teams
-	teams, err := r.client.Team.GetAll(ctx, dtrack.PageOptions{})
+	teamID, teamIDDiags := utils.ParseAttributeUUID(state.TeamID.ValueString(), "team_id")
+	resp.Diagnostics.Append(teamIDDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// The client pages through all teams, since v4's single-team GET omits the keys.
+	keys, err := r.client.Team.GetAPIKeys(ctx, teamID)
 	if err != nil {
+		var apiErr *dtrack.APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read team, got error: %s", err))
 		return
 	}
 
 	found := false
-	for _, team := range teams.Items {
-		if team.UUID.String() != state.TeamID.ValueString() {
-			continue
-		}
-
-		for _, key := range team.APIKeys {
-			if key.PublicID == state.PublicID.ValueString() {
-				found = true
-				break
-			}
+	for _, key := range keys {
+		if key.PublicID == state.PublicID.ValueString() {
+			found = true
+			break
 		}
 	}
 

@@ -84,6 +84,14 @@ func FindNotificationPublisher(ctx context.Context, testDependencyTrack *testuti
 	return nil, nil
 }
 
+// TestCheckPublisherKind checks publisher_class on v4 or extension_name on v5.
+func TestCheckPublisherKind(testDependencyTrack *testutils.TestDependencyTrack, resourceName, extension string) resource.TestCheckFunc {
+	if testDependencyTrack.IsV5() {
+		return resource.TestCheckResourceAttr(resourceName, "extension_name", extension)
+	}
+	return resource.TestCheckResourceAttr(resourceName, "publisher_class", testutils.PublisherClass(extension))
+}
+
 func CreateNotificationPublisherResourceName(localName string) string {
 	return "dependencytrack_notification_publisher." + localName
 }

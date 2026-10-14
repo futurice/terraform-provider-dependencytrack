@@ -128,8 +128,10 @@ func (r *NotificationRuleProjectResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	// There is no API mehtod for a single rule, so we need to get all rules and filter
-	rules, err := r.client.Notification.GetAllRules(ctx)
+	// There is no API method for a single rule, and v5 caps unpaged lists at 100.
+	rules, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+		return r.client.Notification.GetAllRules(ctx, po)
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read team, got error: %s", err))
 		return

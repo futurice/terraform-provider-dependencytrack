@@ -3,12 +3,12 @@
 page_title: "dependencytrack_config_property Resource - dependencytrack"
 subcategory: ""
 description: |-
-  Configuration property
+  Configuration property. Dependency-Track v4 only. On v5, use dependencytrack_extension_config and dependencytrack_secret, and remove these resources from the configuration.
 ---
 
 # dependencytrack_config_property (Resource)
 
-Configuration property
+Configuration property. Dependency-Track v4 only. On v5, use `dependencytrack_extension_config` and `dependencytrack_secret`, and remove these resources from the configuration.
 
 
 

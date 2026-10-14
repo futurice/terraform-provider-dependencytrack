@@ -27,6 +27,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &NotificationRuleResource{}
 var _ resource.ResourceWithImportState = &NotificationRuleResource{}
+var _ resource.ResourceWithModifyPlan = &NotificationRuleResource{}
 
 func NewNotificationRuleResource() resource.Resource {
 	return &NotificationRuleResource{}
@@ -111,8 +112,13 @@ func (r *NotificationRuleResource) Schema(ctx context.Context, req resource.Sche
 				Default:  booldefault.StaticBool(false),
 			},
 			"publisher_config": schema.StringAttribute{
-				MarkdownDescription: "Publisher configuration in JSON format",
-				Optional:            true,
+				MarkdownDescription: "Publisher configuration in JSON format. Dependency-Track v5 validates it against the publisher's rule config schema and fills in a default when it's omitted. " +
+					"Removing it clears the config on v4. v5 always has one, so there the current config stays.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -137,6 +143,38 @@ func (r *NotificationRuleResource) Configure(ctx context.Context, req resource.C
 	r.client = client
 }
 
+func (r *NotificationRuleResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() || r.client == nil {
+		return
+	}
+
+	var config, state NotificationRuleResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Computed keeps the prior config when the attribute is removed, so only an explicit null clears it.
+	if !config.PublisherConfig.IsNull() || state.PublisherConfig.IsNull() {
+		return
+	}
+
+	v5, diags := utils.IsV5(ctx, r.client)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if v5 {
+		resp.Diagnostics.AddAttributeWarning(path.Root("publisher_config"), "Publisher Config Kept",
+			"Dependency-Track v5 requires a publisher config on every rule, so removing publisher_config keeps the current one. Set it to change it.")
+		return
+	}
+
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("publisher_config"), types.StringNull())...)
+}
+
 func (r *NotificationRuleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan NotificationRuleResourceModel
 
@@ -149,24 +187,24 @@ func (r *NotificationRuleResource) Create(ctx context.Context, req resource.Crea
 	dtRule, diags := TFRuleToDTRule(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 
+	// The client follows create with an update, since create drops most settings on both v4 and v5.
 	respRule, err := r.client.Notification.CreateRule(ctx, dtRule)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create notification rule, got error: %s", err))
+
+		// The rule exists if only the follow-up update failed. Saving it marks it tainted, so the next apply
+		// replaces it instead of creating a duplicate.
+		if respRule.UUID != uuid.Nil {
+			created, createdDiags := DTRuleToTFRule(ctx, respRule)
+			resp.Diagnostics.Append(createdDiags...)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &created)...)
+		}
 		return
 	}
 
-	// Some attributes can not be set on creation
-	if dtRule.PublisherConfig != "" {
-		dtRule.UUID = respRule.UUID
-		respRule, err = r.client.Notification.UpdateRule(ctx, dtRule)
-		if err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update notification rule, got error: %s", err))
-			return
-		}
-	}
-
-	plan, diags = DTRuleToTFRule(ctx, respRule)
+	newState, diags := DTRuleToTFRule(ctx, respRule)
 	resp.Diagnostics.Append(diags...)
+	plan = keepEquivalentPublisherConfig(newState, plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -180,7 +218,7 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	rules, err := r.client.Notification.GetAllRules(ctx)
+	rule, err := r.findRule(ctx, state.ID.ValueString(), state.Name.ValueString())
 	if err != nil {
 		var apiErr *dtrack.APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
@@ -192,23 +230,46 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	found := false
-	for _, rule := range rules {
-		if rule.UUID.String() == state.ID.ValueString() {
-			found = true
-			newState, diags := DTRuleToTFRule(ctx, rule)
-			resp.Diagnostics.Append(diags...)
-			state = newState
-			break
-		}
-	}
-
-	if !found {
+	if rule == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
+	newState, diags := DTRuleToTFRule(ctx, *rule)
+	resp.Diagnostics.Append(diags...)
+	state = keepEquivalentPublisherConfig(newState, state)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// findRule returns the rule with the given UUID, or nil if there is none. There is no API method for a single rule,
+// so it searches by the name in state, and lists every rule only when the name was changed outside Terraform.
+func (r *NotificationRuleResource) findRule(ctx context.Context, id, name string) (*dtrack.NotificationRule, error) {
+	rule, err := findRuleIn(id, func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+		return r.client.Notification.SearchRules(ctx, name, po)
+	})
+	if err != nil || rule != nil {
+		return rule, err
+	}
+
+	return findRuleIn(id, func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+		return r.client.Notification.GetAllRules(ctx, po)
+	})
+}
+
+// findRuleIn pages through every rule fetchPage returns, since v5 caps unpaged lists at 100.
+func findRuleIn(id string, fetchPage func(dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error)) (*dtrack.NotificationRule, error) {
+	rules, err := dtrack.FetchAll(fetchPage)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range rules {
+		if rules[i].UUID.String() == id {
+			return &rules[i], nil
+		}
+	}
+	return nil, nil
 }
 
 func (r *NotificationRuleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -224,14 +285,27 @@ func (r *NotificationRuleResource) Update(ctx context.Context, req resource.Upda
 	dtRule, diags := TFRuleToDTRule(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 
+	// An update overwrites the tags, and on v5 the filter expression. Neither is managed here, so keep
+	// whatever the rule has, e.g. from the UI.
+	current, err := r.findRule(ctx, state.ID.ValueString(), state.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read notification rule, got error: %s", err))
+		return
+	}
+	if current != nil {
+		dtRule.FilterExpression = current.FilterExpression
+		dtRule.Tags = current.Tags
+	}
+
 	respRule, err := r.client.Notification.UpdateRule(ctx, dtRule)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update notification rule, got error: %s", err))
 		return
 	}
 
-	state, diags = DTRuleToTFRule(ctx, respRule)
+	newState, diags := DTRuleToTFRule(ctx, respRule)
 	resp.Diagnostics.Append(diags...)
+	state = keepEquivalentPublisherConfig(newState, plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -263,6 +337,15 @@ func (r *NotificationRuleResource) ImportState(ctx context.Context, req resource
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// keepEquivalentPublisherConfig keeps the prior publisher_config string when the server returns the same JSON reformatted.
+func keepEquivalentPublisherConfig(rule, prior NotificationRuleResourceModel) NotificationRuleResourceModel {
+	if !prior.PublisherConfig.IsNull() && !prior.PublisherConfig.IsUnknown() && !rule.PublisherConfig.IsNull() &&
+		utils.JSONEqual(rule.PublisherConfig.ValueString(), prior.PublisherConfig.ValueString()) {
+		rule.PublisherConfig = prior.PublisherConfig
+	}
+	return rule
+}
+
 func DTRuleToTFRule(ctx context.Context, dtRule dtrack.NotificationRule) (NotificationRuleResourceModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	rule := NotificationRuleResourceModel{
@@ -277,9 +360,9 @@ func DTRuleToTFRule(ctx context.Context, dtRule dtrack.NotificationRule) (Notifi
 		PublisherConfig:      types.StringValue(dtRule.PublisherConfig),
 	}
 
-	// normalize to null to allow the attribute to be optional
+	// normalize to null to allow the attribute to be optional, and compact so list and update responses match
 	if len(dtRule.PublisherConfig) > 0 {
-		rule.PublisherConfig = types.StringValue(dtRule.PublisherConfig)
+		rule.PublisherConfig = types.StringValue(utils.CompactJSON(dtRule.PublisherConfig))
 	} else {
 		rule.PublisherConfig = types.StringNull()
 	}

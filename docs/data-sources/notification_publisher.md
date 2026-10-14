@@ -23,7 +23,8 @@ Notification publisher data source
 
 - `default_publisher` (Boolean) Whether this is a default publisher
 - `description` (String) Description of the publisher
+- `extension_name` (String) Extension of the publisher, e.g. `slack`. Null on Dependency-Track v4.
 - `id` (String) Publisher UUID
-- `publisher_class` (String) Class of the publisher
+- `publisher_class` (String) Class of the publisher. Null on Dependency-Track v5.
 - `template` (String) Template used by the publisher
 - `template_mime_type` (String) MIME type of the template

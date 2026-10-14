@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -23,6 +24,26 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &TeamPermissionResource{}
 var _ resource.ResourceWithImportState = &TeamPermissionResource{}
+
+// teamLocks holds a mutex per team ID. Dependency-Track answers 404 when two requests change the same team's
+// permissions at once, and Terraform runs sibling permission resources in parallel.
+var (
+	teamLocksMu sync.Mutex
+	teamLocks   = map[uuid.UUID]*sync.Mutex{}
+)
+
+func lockTeam(teamID uuid.UUID) func() {
+	teamLocksMu.Lock()
+	mu, ok := teamLocks[teamID]
+	if !ok {
+		mu = &sync.Mutex{}
+		teamLocks[teamID] = mu
+	}
+	teamLocksMu.Unlock()
+
+	mu.Lock()
+	return mu.Unlock
+}
 
 func NewTeamPermissionResource() resource.Resource {
 	return &TeamPermissionResource{}
@@ -102,7 +123,9 @@ func (r *TeamPermissionResource) Create(ctx context.Context, req resource.Create
 		Name: plan.Name.ValueString(),
 	}
 
+	unlock := lockTeam(teamID)
 	_, err := r.client.Permission.AddPermissionToTeam(ctx, permission, teamID)
+	unlock()
 	if err != nil {
 		var apiErr *dtrack.APIError
 		if errors.As(err, &apiErr) {
@@ -231,7 +254,9 @@ func (r *TeamPermissionResource) Delete(ctx context.Context, req resource.Delete
 		Name: state.Name.ValueString(),
 	}
 
+	unlock := lockTeam(teamID)
 	_, err := r.client.Permission.RemovePermissionFromTeam(ctx, permission, teamID)
+	unlock()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete permission, got error: %s", err))
 		return

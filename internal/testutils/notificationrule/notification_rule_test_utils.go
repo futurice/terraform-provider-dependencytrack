@@ -30,7 +30,7 @@ func TestAccCheckNotificationRuleExistsAndHasExpectedLazyData(ctx context.Contex
 		}
 
 		// Publisher.Template not returned from this endpoint for some reason
-		diff := cmp.Diff(rule, &expectedRule, cmpopts.IgnoreFields(dtrack.NotificationRule{}, "UUID", "Projects", "Publisher.Template"))
+		diff := cmp.Diff(rule, &expectedRule, cmpopts.IgnoreFields(dtrack.NotificationRule{}, "UUID", "Projects", "Publisher.Template"), cmpopts.EquateEmpty())
 		if diff != "" {
 			return fmt.Errorf("notification rule for resource %s is different than expected: %s", resourceName, diff)
 		}
@@ -68,7 +68,9 @@ func FindNotificationRuleByResourceName(ctx context.Context, testDependencyTrack
 }
 
 func FindNotificationRule(ctx context.Context, testDependencyTrack *testutils.TestDependencyTrack, ruleID uuid.UUID) (*dtrack.NotificationRule, error) {
-	rules, err := testDependencyTrack.Client.Notification.GetAllRules(ctx)
+	rules, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+		return testDependencyTrack.Client.Notification.GetAllRules(ctx, po)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get notification rule from Dependency-Track: %w", err)
 	}

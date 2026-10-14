@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // ParseUUID parses the UUID value returning a possible error as Diagnostics instead of error.
@@ -34,4 +35,12 @@ func ParseAttributeUUID(uuidString string, attributePath string) (uuid.UUID, dia
 	}
 
 	return id, diags
+}
+
+// StringValueOrNull returns a null string for an empty value, so optional attributes the server leaves empty stay null.
+func StringValueOrNull(value string) types.String {
+	if value == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(value)
 }

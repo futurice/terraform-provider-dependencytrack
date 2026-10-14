@@ -19,33 +19,31 @@ func TestAccNotificationPublisherResource_basic(t *testing.T) {
 
 	publisherResourceName := notificationpublishertestutils.CreateNotificationPublisherResourceName("test")
 
-	testPublisher := dtrack.NotificationPublisher{
+	testPublisher := testDependencyTrack.WithPublisherKind(dtrack.NotificationPublisher{
 		Name:             acctest.RandomWithPrefix("test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.SlackPublisher",
 		TemplateMimeType: "application/json",
 		Template:         `{}`,
 		DefaultPublisher: false,
-	}
+	}, "slack")
 
-	testUpdatedPublisher := dtrack.NotificationPublisher{
+	testUpdatedPublisher := testDependencyTrack.WithPublisherKind(dtrack.NotificationPublisher{
 		Name:             acctest.RandomWithPrefix("other-test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.WebhookPublisher",
 		TemplateMimeType: "application/json+something",
 		Template:         `{"a": "b"}`,
 		DefaultPublisher: false,
-	}
+	}, "webhook")
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
 		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNotificationPublisherConfigBasic(testDependencyTrack, testPublisher.Name, testPublisher.PublisherClass, testPublisher.TemplateMimeType, testPublisher.Template),
+				Config: testAccNotificationPublisherConfigBasic(testDependencyTrack, testPublisher.Name, testDependencyTrack.PublisherKindAttribute("slack"), testPublisher.TemplateMimeType, testPublisher.Template),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					notificationpublishertestutils.TestAccCheckNotificationPublisherExistsAndHasExpectedData(ctx, testDependencyTrack, publisherResourceName, testPublisher),
 					resource.TestCheckResourceAttrSet(publisherResourceName, "id"),
 					resource.TestCheckResourceAttr(publisherResourceName, "name", testPublisher.Name),
-					resource.TestCheckResourceAttr(publisherResourceName, "publisher_class", testPublisher.PublisherClass),
+					notificationpublishertestutils.TestCheckPublisherKind(testDependencyTrack, publisherResourceName, "slack"),
 					resource.TestCheckResourceAttr(publisherResourceName, "template_mime_type", testPublisher.TemplateMimeType),
 					resource.TestCheckResourceAttr(publisherResourceName, "template", testPublisher.Template),
 				),
@@ -56,11 +54,11 @@ func TestAccNotificationPublisherResource_basic(t *testing.T) {
 				ImportStateVerify: true,
 			},
 			{
-				Config: testAccNotificationPublisherConfigBasic(testDependencyTrack, testUpdatedPublisher.Name, testUpdatedPublisher.PublisherClass, testUpdatedPublisher.TemplateMimeType, testUpdatedPublisher.Template),
+				Config: testAccNotificationPublisherConfigBasic(testDependencyTrack, testUpdatedPublisher.Name, testDependencyTrack.PublisherKindAttribute("webhook"), testUpdatedPublisher.TemplateMimeType, testUpdatedPublisher.Template),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					notificationpublishertestutils.TestAccCheckNotificationPublisherExistsAndHasExpectedData(ctx, testDependencyTrack, publisherResourceName, testUpdatedPublisher),
 					resource.TestCheckResourceAttr(publisherResourceName, "name", testUpdatedPublisher.Name),
-					resource.TestCheckResourceAttr(publisherResourceName, "publisher_class", testUpdatedPublisher.PublisherClass),
+					notificationpublishertestutils.TestCheckPublisherKind(testDependencyTrack, publisherResourceName, "webhook"),
 					resource.TestCheckResourceAttr(publisherResourceName, "template_mime_type", testUpdatedPublisher.TemplateMimeType),
 					resource.TestCheckResourceAttr(publisherResourceName, "template", testUpdatedPublisher.Template),
 				),
@@ -75,21 +73,19 @@ func TestAccNotificationPublisherResource_description(t *testing.T) {
 
 	publisherResourceName := notificationpublishertestutils.CreateNotificationPublisherResourceName("test")
 
-	testPublisher := dtrack.NotificationPublisher{
+	testPublisher := testDependencyTrack.WithPublisherKind(dtrack.NotificationPublisher{
 		Name:             acctest.RandomWithPrefix("test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.SlackPublisher",
 		TemplateMimeType: "application/json",
 		Template:         `{}`,
 		Description:      "Some description",
-	}
+	}, "slack")
 
-	testUpdatedPublisher := dtrack.NotificationPublisher{
+	testUpdatedPublisher := testDependencyTrack.WithPublisherKind(dtrack.NotificationPublisher{
 		Name:             acctest.RandomWithPrefix("test-notification-publisher"),
-		PublisherClass:   "org.dependencytrack.notification.publisher.SlackPublisher",
 		TemplateMimeType: "application/json",
 		Template:         `{}`,
 		Description:      "Some other description",
-	}
+	}, "slack")
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
@@ -113,17 +109,17 @@ func TestAccNotificationPublisherResource_description(t *testing.T) {
 	})
 }
 
-func testAccNotificationPublisherConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, publisherName, publisherClass, templateMimeType, template string) string {
+func testAccNotificationPublisherConfigBasic(testDependencyTrack *testutils.TestDependencyTrack, publisherName, publisherKind, templateMimeType, template string) string {
 	return testDependencyTrack.AddProviderConfiguration(
 		fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = %[2]q
+	%[2]s
 	template_mime_type = %[3]q
 	template           = %[4]q
 }
 `,
-			publisherName, publisherClass, templateMimeType, template,
+			publisherName, publisherKind, templateMimeType, template,
 		),
 	)
 }
@@ -133,13 +129,13 @@ func testAccNotificationPublisherConfigDescription(testDependencyTrack *testutil
 		fmt.Sprintf(`
 resource "dependencytrack_notification_publisher" "test" {
 	name               = %[1]q
-	publisher_class    = "org.dependencytrack.notification.publisher.SlackPublisher"
+	%[3]s
 	template_mime_type = "application/json"
 	template           = "{}"
 	description        = %[2]q
 }
 `,
-			publisherName, description,
+			publisherName, description, testDependencyTrack.PublisherKindAttribute("slack"),
 		),
 	)
 }
