@@ -23,13 +23,23 @@ func IsV5(ctx context.Context, client *dtrack.Client) (bool, diag.Diagnostics) {
 		return false, diags
 	}
 
-	major, err := strconv.Atoi(strings.SplitN(version, ".", 2)[0])
+	v5, err := IsV5Version(version)
 	if err != nil {
-		diags.AddError("Client Error", fmt.Sprintf("Unable to parse the Dependency-Track server version %q: %s", version, err))
+		diags.AddError("Client Error", fmt.Sprintf("Unable to parse the Dependency-Track server version: %s", err))
 		return false, diags
 	}
 
-	return major >= 5, diags
+	return v5, diags
+}
+
+// IsV5Version reports whether a version such as "5.2.0" is Dependency-Track 5 or later, by its major number.
+func IsV5Version(version string) (bool, error) {
+	major, err := strconv.Atoi(strings.SplitN(version, ".", 2)[0])
+	if err != nil {
+		return false, fmt.Errorf("version %q has no numeric major: %w", version, err)
+	}
+
+	return major >= 5, nil
 }
 
 // RequireV5 returns an error diagnostic when the server runs Dependency-Track 4, for resources that only exist on v5.

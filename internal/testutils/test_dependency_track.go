@@ -14,6 +14,7 @@ import (
 	"time"
 
 	dtrack "github.com/futurice/dependency-track-client-go"
+	"github.com/futurice/terraform-provider-dependencytrack/internal/utils"
 	"github.com/google/uuid"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/network"
@@ -118,7 +119,11 @@ func NewTestDependencyTrack() (*TestDependencyTrack, error) {
 		closeErr := tdt.Close()
 		return nil, errors.Join(fmt.Errorf("could not read Dependency-Track version: %w", err), closeErr)
 	}
-	tdt.v5 = isV5Version(version)
+	tdt.v5, err = utils.IsV5Version(version)
+	if err != nil {
+		closeErr := tdt.Close()
+		return nil, errors.Join(err, closeErr)
+	}
 
 	fmt.Printf("Test Dependency-Track version is %s\n", version)
 
@@ -261,12 +266,12 @@ func newTestDependencyTrackFromInternalContainer(config *testDependencyTrackConf
 	return testDependencyTrack, nil
 }
 
-func isV5Version(version string) bool {
-	return !strings.HasPrefix(version, "4.")
-}
-
 func startDependencyTrackContainer(ctx context.Context, version string) (*dependencyTrackContainer, error) {
-	if isV5Version(version) {
+	v5, err := utils.IsV5Version(version)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be a release version such as %s: %w", DependencyTrackVersionEnvVarName, defaultDependencyTrackVersion, err)
+	}
+	if v5 {
 		return startDependencyTrackV5Container(ctx, version)
 	}
 
