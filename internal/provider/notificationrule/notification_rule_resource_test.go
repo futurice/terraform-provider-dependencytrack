@@ -310,6 +310,51 @@ func TestAccNotificationRuleResource_keepsTagsAndFilterExpression(t *testing.T) 
 	})
 }
 
+func TestAccNotificationRuleResource_unsetPublisherConfig(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
+
+	ruleResourceName := notificationruletestutils.CreateNotificationRuleResourceName("test")
+	rule := dtrack.NotificationRule{
+		Name:              acctest.RandomWithPrefix("test-notification-rule"),
+		NotificationLevel: "INFORMATIONAL",
+		Scope:             "PORTFOLIO",
+		Enabled:           true,
+		NotifyOn:          []string{"NEW_VULNERABILITY"},
+		PublisherConfig:   slackPublisherConfig("unset"),
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNotificationRuleConfigWithSettings(testDependencyTrack, testPublisher.Name, rule),
+			},
+			{
+				Config: testAccNotificationRuleConfigBasic(testDependencyTrack, testPublisher.Name, rule.Name, rule.Scope, rule.NotificationLevel),
+				Check: func(state *terraform.State) error {
+					found, err := notificationruletestutils.FindNotificationRuleByResourceName(ctx, testDependencyTrack, state, ruleResourceName)
+					if err != nil {
+						return err
+					}
+					if found == nil {
+						return fmt.Errorf("rule for %s not found", ruleResourceName)
+					}
+					// v4 clears the config. v5 always has one, so it keeps the current config and warns.
+					if testDependencyTrack.IsV5() {
+						if !utils.JSONEqual(found.PublisherConfig, rule.PublisherConfig) {
+							return fmt.Errorf("expected v5 to keep publisher config %s, got %q", rule.PublisherConfig, found.PublisherConfig)
+						}
+					} else if found.PublisherConfig != "" {
+						return fmt.Errorf("expected removing publisher_config to clear it, got %q", found.PublisherConfig)
+					}
+					return nil
+				},
+			},
+		},
+	})
+}
+
 // setTagsAndFilterExpression sets what the UI would: a tag, and on v5 a filter expression.
 func setTagsAndFilterExpression(ctx context.Context, t *testing.T, ruleID, filterExpression string) {
 	t.Helper()

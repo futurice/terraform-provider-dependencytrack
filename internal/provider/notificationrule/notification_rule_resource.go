@@ -27,6 +27,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &NotificationRuleResource{}
 var _ resource.ResourceWithImportState = &NotificationRuleResource{}
+var _ resource.ResourceWithModifyPlan = &NotificationRuleResource{}
 
 func NewNotificationRuleResource() resource.Resource {
 	return &NotificationRuleResource{}
@@ -111,9 +112,10 @@ func (r *NotificationRuleResource) Schema(ctx context.Context, req resource.Sche
 				Default:  booldefault.StaticBool(false),
 			},
 			"publisher_config": schema.StringAttribute{
-				MarkdownDescription: "Publisher configuration in JSON format. Dependency-Track v5 validates it against the publisher's rule config schema and fills in a default when it's omitted.",
-				Optional:            true,
-				Computed:            true,
+				MarkdownDescription: "Publisher configuration in JSON format. Dependency-Track v5 validates it against the publisher's rule config schema and fills in a default when it's omitted. " +
+					"Removing it clears the config on v4. v5 always has one, so there the current config stays.",
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -139,6 +141,38 @@ func (r *NotificationRuleResource) Configure(ctx context.Context, req resource.C
 	}
 
 	r.client = client
+}
+
+func (r *NotificationRuleResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() || r.client == nil {
+		return
+	}
+
+	var config, state NotificationRuleResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Computed keeps the prior config when the attribute is removed, so only an explicit null clears it.
+	if !config.PublisherConfig.IsNull() || state.PublisherConfig.IsNull() {
+		return
+	}
+
+	v5, diags := utils.IsV5(ctx, r.client)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if v5 {
+		resp.Diagnostics.AddAttributeWarning(path.Root("publisher_config"), "Publisher Config Kept",
+			"Dependency-Track v5 requires a publisher config on every rule, so removing publisher_config keeps the current one. Set it to change it.")
+		return
+	}
+
+	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("publisher_config"), types.StringNull())...)
 }
 
 func (r *NotificationRuleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
