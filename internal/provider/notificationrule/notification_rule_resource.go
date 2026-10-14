@@ -218,7 +218,7 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	rule, err := r.findRule(ctx, state.ID.ValueString())
+	rule, err := r.findRule(ctx, state.ID.ValueString(), state.Name.ValueString())
 	if err != nil {
 		var apiErr *dtrack.APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
@@ -242,12 +242,24 @@ func (r *NotificationRuleResource) Read(ctx context.Context, req resource.ReadRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// findRule returns the rule with the given UUID, or nil if there is none.
-func (r *NotificationRuleResource) findRule(ctx context.Context, id string) (*dtrack.NotificationRule, error) {
-	// There is no API method for a single rule, and v5 caps unpaged lists at 100.
-	rules, err := dtrack.FetchAll(func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+// findRule returns the rule with the given UUID, or nil if there is none. There is no API method for a single rule,
+// so it searches by the name in state, and lists every rule only when the name was changed outside Terraform.
+func (r *NotificationRuleResource) findRule(ctx context.Context, id, name string) (*dtrack.NotificationRule, error) {
+	rule, err := findRuleIn(id, func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
+		return r.client.Notification.SearchRules(ctx, name, po)
+	})
+	if err != nil || rule != nil {
+		return rule, err
+	}
+
+	return findRuleIn(id, func(po dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error) {
 		return r.client.Notification.GetAllRules(ctx, po)
 	})
+}
+
+// findRuleIn pages through every rule fetchPage returns, since v5 caps unpaged lists at 100.
+func findRuleIn(id string, fetchPage func(dtrack.PageOptions) (dtrack.Page[dtrack.NotificationRule], error)) (*dtrack.NotificationRule, error) {
+	rules, err := dtrack.FetchAll(fetchPage)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +287,7 @@ func (r *NotificationRuleResource) Update(ctx context.Context, req resource.Upda
 
 	// An update overwrites the tags, and on v5 the filter expression. Neither is managed here, so keep
 	// whatever the rule has, e.g. from the UI.
-	current, err := r.findRule(ctx, state.ID.ValueString())
+	current, err := r.findRule(ctx, state.ID.ValueString(), state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read notification rule, got error: %s", err))
 		return

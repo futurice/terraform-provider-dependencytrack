@@ -355,6 +355,57 @@ func TestAccNotificationRuleResource_unsetPublisherConfig(t *testing.T) {
 	})
 }
 
+func TestAccNotificationRuleResource_renamedOutsideTerraform(t *testing.T) {
+	ctx := testutils.CreateTestContext(t)
+
+	ruleResourceName := notificationruletestutils.CreateNotificationRuleResourceName("test")
+	ruleName := acctest.RandomWithPrefix("test-notification-rule")
+	var ruleID, ruleIDAfter string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testutils.TestAccPreCheck(t) },
+		ProtoV6ProviderFactories: testutils.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNotificationRuleConfigBasic(testDependencyTrack, testPublisher.Name, ruleName, "PORTFOLIO", "INFORMATIONAL"),
+				Check:  testutils.TestAccCheckGetResourceID(ruleResourceName, &ruleID),
+			},
+			{
+				// The new name doesn't contain the old one, so the search misses and the lookup has to list every rule.
+				PreConfig: func() { renameRule(ctx, t, ruleID, acctest.RandomWithPrefix("renamed-rule")) },
+				Config:    testAccNotificationRuleConfigBasic(testDependencyTrack, testPublisher.Name, ruleName, "PORTFOLIO", "INFORMATIONAL"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testutils.TestAccCheckGetResourceID(ruleResourceName, &ruleIDAfter),
+					resource.TestCheckResourceAttr(ruleResourceName, "name", ruleName),
+					func(*terraform.State) error {
+						if ruleIDAfter != ruleID {
+							return fmt.Errorf("expected the rule to be renamed back in place, but %s replaced %s", ruleIDAfter, ruleID)
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+func renameRule(ctx context.Context, t *testing.T, ruleID, name string) {
+	t.Helper()
+
+	rule, err := notificationruletestutils.FindNotificationRule(ctx, testDependencyTrack, uuid.MustParse(ruleID))
+	if err != nil {
+		t.Fatalf("unable to find rule %s: %v", ruleID, err)
+	}
+	if rule == nil {
+		t.Fatalf("rule %s not found", ruleID)
+	}
+
+	rule.Name = name
+	if _, err := testDependencyTrack.Client.Notification.UpdateRule(ctx, *rule); err != nil {
+		t.Fatalf("unable to rename rule: %v", err)
+	}
+}
+
 // setTagsAndFilterExpression sets what the UI would: a tag, and on v5 a filter expression.
 func setTagsAndFilterExpression(ctx context.Context, t *testing.T, ruleID, filterExpression string) {
 	t.Helper()
